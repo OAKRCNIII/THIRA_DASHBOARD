@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <title>THIRA Dashboard</title>
-<meta http-equiv="refresh" content="0; url=dashboard.html">
-<script>location.replace('dashboard.html');</script>
+<script>
+// Auto-redirect: mobile → mobile.html, desktop → dashboard.html
+const isMobile = /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || window.innerWidth < 768;
+location.replace(isMobile ? 'mobile.html' : 'dashboard.html');
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=dashboard.html"></noscript>
 <style>
   body { font-family: sans-serif; text-align: center; padding: 60px 16px;
          background: linear-gradient(135deg, #1e3a5f, #2c5282); color: white;
