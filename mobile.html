@@ -2,150 +2,324 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#1e3a5f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="THIRA">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
-<title>THIRA Mobile</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<title>THIRA</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="auth.js"></script>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { font-family: 'Sarabun', sans-serif; margin: 0; background: #f3f4f6; color: #222;
-         padding-bottom: 80px; min-height: 100vh; }
-  a { color: inherit; text-decoration: none; }
+  /* ── iOS-style reset ── */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Sarabun', 'SF Pro Text', system-ui, sans-serif;
+    margin: 0;
+    background: #f2f2f7;          /* iOS systemGroupedBackground */
+    color: #1c1c1e;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    min-height: 100vh;
+    overscroll-behavior-y: contain;
+  }
+  a { color: inherit; text-decoration: none; -webkit-user-drag: none; }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; -webkit-appearance: none; appearance: none; }
+  input:focus { outline: none; }
 
-  /* ── Top Header ── */
-  .top { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color: white;
-         padding: 14px 16px; position: sticky; top: 0; z-index: 50;
-         box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  /* ── Top sticky header ── */
+  .top {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+    color: white;
+    padding: calc(env(safe-area-inset-top) + 10px) 16px 12px;
+    position: sticky; top: 0; z-index: 50;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+  }
   .top-row { display: flex; justify-content: space-between; align-items: center; }
-  .top h1 { font-size: 18px; margin: 0; font-weight: 700; }
-  .top-row .actions { display: flex; gap: 8px; }
-  .top-row button { background: rgba(255,255,255,0.2); border: 0; color: white;
-                    width: 36px; height: 36px; border-radius: 18px; font-size: 16px;
-                    cursor: pointer; }
-  .top-row button:active { background: rgba(255,255,255,0.4); }
-  .period-bar { display: flex; gap: 6px; margin-top: 10px; align-items: center; font-size: 14px; }
-  .period-bar input { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
-                      color: white; padding: 6px 10px; border-radius: 6px; font-family: inherit;
-                      font-size: 14px; width: 110px; text-align: center; }
-  .period-bar input::placeholder { color: rgba(255,255,255,0.6); }
-  .period-bar .nav-btn { background: rgba(255,255,255,0.15); border: 0; color: white;
-                         padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
-  .period-bar .nav-btn:active { background: rgba(255,255,255,0.35); }
+  .top-row h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: -0.2px; }
+  .top-row .actions { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.18);
+    border: 0; border-radius: 18px;
+    color: white; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .icon-btn:active { background: rgba(255,255,255,0.35); }
 
-  /* ── Loading / Error ── */
-  .status, .error { margin: 12px 16px; padding: 12px 16px; border-radius: 10px; font-size: 14px; }
+  .period-bar {
+    display: flex; gap: 6px; margin-top: 10px; align-items: center;
+  }
+  .period-input {
+    flex: 1;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: white;
+    padding: 8px 12px; border-radius: 10px;
+    font-size: 15px; text-align: center;
+    font-weight: 600; letter-spacing: 0.5px;
+  }
+  .period-input::placeholder { color: rgba(255,255,255,0.5); }
+  .period-nav {
+    background: rgba(255,255,255,0.15); border: 0;
+    width: 36px; height: 36px; border-radius: 18px;
+    color: white; font-size: 14px; cursor: pointer;
+  }
+  .period-nav:active { background: rgba(255,255,255,0.35); }
+  .period-label {
+    flex-shrink: 0; font-size: 11px; opacity: 0.7;
+    text-align: right; padding-left: 6px;
+  }
+
+  /* ── Status / Error ── */
+  .status, .error {
+    margin: 12px 16px; padding: 10px 14px; border-radius: 10px;
+    font-size: 14px; font-weight: 500;
+  }
   .status { background: #fef3c7; color: #92400e; }
   .error { background: #fee2e2; color: #991b1b; }
 
+  /* ── Section ── */
+  .section { padding: 14px 16px 6px; font-size: 12px; color: #6b7280; font-weight: 600;
+             text-transform: uppercase; letter-spacing: 0.5px; }
+  .section:first-of-type { padding-top: 8px; }
+
   /* ── Fleet KPI ── */
-  .fleet-kpi { background: white; margin: 12px 12px 8px; border-radius: 14px; padding: 14px 16px;
-               box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .fleet-kpi h3 { margin: 0 0 10px; font-size: 14px; color: #555; }
-  .fleet-kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .fleet-kpi-cell { padding: 8px 10px; border-radius: 8px; background: #f9fafb; }
-  .fleet-kpi-cell .label { font-size: 11px; color: #666; }
-  .fleet-kpi-cell .value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
-                           margin-top: 2px; color: #1e3a5f; }
-  .fleet-kpi-cell.paid .value { color: #2f855a; }
-  .fleet-kpi-cell.pending .value { color: #c05621; }
+  .fleet-kpi {
+    background: white;
+    margin: 0 16px 8px;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  }
+  .fleet-kpi h3 { margin: 0 0 10px; font-size: 13px; color: #6b7280; font-weight: 600; }
+  .fleet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fleet-cell {
+    padding: 10px 12px; border-radius: 10px;
+    background: #f7f7f8;
+  }
+  .fleet-cell .label { font-size: 11px; color: #6b7280; font-weight: 500; }
+  .fleet-cell .value {
+    font-size: 17px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 3px; color: #1c1c1e;
+    letter-spacing: -0.3px;
+  }
+  .fleet-cell.paid { background: #ecfdf5; }
+  .fleet-cell.paid .value { color: #065f46; }
+  .fleet-cell.pending { background: #fef3c7; }
+  .fleet-cell.pending .value { color: #92400e; }
 
-  /* ── Truck Card ── */
-  .section-label { margin: 18px 16px 6px; font-size: 12px; color: #6b7280; font-weight: 600;
-                   text-transform: uppercase; letter-spacing: 0.5px; }
-  .truck-cards { display: flex; flex-direction: column; gap: 10px; padding: 0 12px; }
-  .truck-card { background: white; border-radius: 14px; padding: 14px 16px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.1s; }
-  .truck-card:active { transform: scale(0.98); }
-  .tc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .tc-plate { font-size: 18px; font-weight: 700; color: #1e3a5f; }
-  .tc-driver { font-size: 12px; color: #666; margin-top: 1px; }
-  .tc-profit { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .tc-profit.pos { color: #2f855a; }
-  .tc-profit.neg { color: #c05621; }
-  .tc-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px;
-              padding-top: 8px; border-top: 1px solid #f3f4f6; }
-  .tc-stat { font-size: 11px; color: #666; text-align: center; }
-  .tc-stat .v { font-size: 14px; font-weight: 600; color: #1e3a5f; font-variant-numeric: tabular-nums;
-                display: block; margin-bottom: 2px; }
-  .tc-bills { display: flex; gap: 6px; margin-top: 8px; }
-  .tc-bill { flex: 1; padding: 5px 8px; border-radius: 6px; font-size: 11px; text-align: center; }
-  .tc-bill.bill1 { background: #fef3c7; color: #92400e; }
-  .tc-bill.bill2 { background: #d1fae5; color: #065f46; }
-  .tc-fuel { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px;
-             display: flex; justify-content: space-between; align-items: center; }
-  .tc-fuel.ok { background: #d1fae5; color: #065f46; }
-  .tc-fuel.warn { background: #fef3c7; color: #92400e; }
-  .tc-fuel.danger { background: #fee2e2; color: #991b1b; }
+  /* ── Truck Card (iOS list style) ── */
+  .cards-wrap {
+    background: white;
+    margin: 0 16px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  }
+  .truck-card {
+    padding: 14px 16px;
+    cursor: pointer;
+    border-bottom: 0.5px solid #e5e7eb;
+    position: relative;
+    transition: background 0.1s;
+  }
+  .truck-card:last-child { border-bottom: 0; }
+  .truck-card:active { background: #f2f2f7; }
+  .tc-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .tc-info { flex: 1; min-width: 0; }
+  .tc-plate {
+    font-size: 17px; font-weight: 700; color: #1c1c1e;
+    letter-spacing: -0.3px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tc-plate .ico { font-size: 16px; }
+  .tc-driver { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .tc-profit {
+    font-size: 18px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.3px;
+    text-align: right;
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+  .tc-profit.pos { color: #059669; }
+  .tc-profit.neg { color: #dc2626; }
+  .tc-profit-label { font-size: 11px; color: #6b7280; font-weight: 500; }
 
-  /* ── Bottom Nav ── */
-  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white;
-                box-shadow: 0 -2px 8px rgba(0,0,0,0.1); display: flex; padding: 8px 0;
-                z-index: 50; }
-  .nav-item { flex: 1; text-align: center; padding: 6px 4px; color: #6b7280; font-size: 11px; }
-  .nav-item.active { color: #2c5282; font-weight: 600; }
+  .tc-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+    margin-top: 4px; padding: 8px 0;
+    border-top: 0.5px solid #e5e7eb;
+  }
+  .tc-stat { font-size: 11px; color: #6b7280; text-align: center; font-weight: 500; }
+  .tc-stat .v {
+    font-size: 14px; font-weight: 700; color: #1c1c1e;
+    font-variant-numeric: tabular-nums;
+    display: block; margin-bottom: 2px;
+  }
+
+  .tc-badges { display: flex; gap: 6px; margin-top: 8px; }
+  .badge {
+    flex: 1; padding: 6px 8px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; text-align: center;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .badge .name { opacity: 0.85; }
+  .badge.bill1 { background: #fef3c7; color: #78350f; }
+  .badge.bill2 { background: #d1fae5; color: #065f46; }
+  .badge.fuel-ok { background: #d1fae5; color: #065f46; }
+  .badge.fuel-warn { background: #fef3c7; color: #92400e; }
+  .badge.fuel-danger { background: #fee2e2; color: #991b1b; }
+
+  .tc-fuel { margin-top: 6px; }
+  .chevron {
+    position: absolute; right: 16px; top: 50%;
+    transform: translateY(-50%);
+    color: #c7c7cc; font-size: 22px; font-weight: 500;
+  }
+
+  /* ── Bottom Nav (iOS tab bar) ── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid rgba(0,0,0,0.1);
+    display: flex;
+    padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+    z-index: 50;
+  }
+  .nav-item {
+    flex: 1; text-align: center; padding: 4px 4px;
+    color: #8e8e93; font-size: 10px; font-weight: 500;
+    transition: color 0.1s;
+  }
+  .nav-item:active { color: #1c1c1e; }
+  .nav-item.active { color: #007aff; }
   .nav-item .icon { font-size: 22px; display: block; margin-bottom: 2px; }
-  .nav-item:active { background: #f3f4f6; }
 
-  /* ── Truck detail modal (mobile) ── */
-  .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
-                    z-index: 200; }
-  .detail-overlay.show { display: block; animation: fadeIn 0.15s; }
+  /* ── Detail bottom-sheet ── */
+  .detail-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none; z-index: 200;
+    animation: fadeIn 0.2s;
+  }
+  .detail-overlay.show { display: block; }
   @keyframes fadeIn { from {opacity:0} to {opacity:1} }
-  .detail-sheet { position: fixed; bottom: 0; left: 0; right: 0; max-height: 92vh;
-                  background: #f3f4f6; border-radius: 18px 18px 0 0; overflow-y: auto;
-                  animation: slideUp 0.2s; padding-bottom: 30px; }
-  @keyframes slideUp { from {transform:translateY(100%)} to {transform:translateY(0)} }
-  .detail-handle { width: 40px; height: 4px; background: #cbd5e1; border-radius: 2px;
-                   margin: 8px auto 0; }
-  .detail-close { position: absolute; top: 8px; right: 12px; background: rgba(0,0,0,0.1);
-                  border: 0; width: 32px; height: 32px; border-radius: 16px; cursor: pointer;
-                  font-size: 16px; }
-  .detail-header { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: white;
-                   padding: 16px 18px; margin-bottom: 0; border-radius: 18px 18px 0 0; padding-top: 22px; }
-  .detail-header h2 { margin: 0; font-size: 22px; }
-  .detail-header .sub { font-size: 13px; opacity: 0.85; margin-top: 2px; }
-  .detail-section { background: white; margin: 10px 12px; border-radius: 12px; padding: 14px 16px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-  .detail-section h3 { margin: 0 0 8px; font-size: 14px; color: #555; }
-  .detail-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
-  .detail-row .lbl { color: #666; }
-  .detail-row .val { font-variant-numeric: tabular-nums; }
-  .detail-row.total { border-top: 2px solid #1e3a5f; margin-top: 8px; padding-top: 8px;
-                      font-weight: 700; color: #1e3a5f; font-size: 16px; }
-  .detail-list-item { display: flex; justify-content: space-between; padding: 6px 0;
-                      font-size: 13px; border-bottom: 1px solid #f3f4f6; }
-  .detail-list-item:last-child { border: 0; }
+  .detail-sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-height: 92vh;
+    background: #f2f2f7;
+    border-radius: 18px 18px 0 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+  @keyframes slideUp {
+    from {transform:translateY(100%)} to {transform:translateY(0)}
+  }
+  .detail-handle {
+    width: 36px; height: 5px;
+    background: #c7c7cc; border-radius: 3px;
+    margin: 8px auto 0;
+  }
+  .detail-close {
+    position: absolute; top: 14px; right: 16px;
+    background: #e5e5ea; border: 0;
+    width: 30px; height: 30px; border-radius: 15px;
+    cursor: pointer; font-size: 14px; font-weight: 600;
+    color: #1c1c1e;
+  }
+  .detail-header {
+    background: linear-gradient(135deg, #1e3a5f, #2c5282);
+    color: white;
+    padding: 22px 18px 16px;
+    margin-bottom: 0;
+    border-radius: 18px 18px 0 0;
+  }
+  .detail-header h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .detail-header .sub { font-size: 13px; opacity: 0.85; margin-top: 4px; font-weight: 500; }
 
-  @media (max-width: 380px) {
+  .detail-section {
+    background: white;
+    margin: 10px 12px;
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  }
+  .detail-section h3 {
+    margin: 0 0 8px; font-size: 12px; color: #6b7280;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .detail-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; font-size: 15px;
+    border-bottom: 0.5px solid #f2f2f7;
+  }
+  .detail-row:last-child { border-bottom: 0; }
+  .detail-row .lbl { color: #1c1c1e; }
+  .detail-row .val { font-variant-numeric: tabular-nums; font-weight: 500; }
+  .detail-row.total {
+    border-top: 2px solid #1e3a5f; border-bottom: 0;
+    margin-top: 6px; padding-top: 10px;
+    font-weight: 700; font-size: 17px;
+  }
+  .detail-row.total .val { font-size: 18px; font-weight: 700; }
+  .detail-row.total .val.pos { color: #059669; }
+  .detail-row.total .val.neg { color: #dc2626; }
+
+  .detail-list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; font-size: 14px;
+    border-bottom: 0.5px solid #f2f2f7;
+  }
+  .detail-list-item:last-child { border-bottom: 0; }
+  .detail-list-item .l { flex: 1; min-width: 0; padding-right: 8px; }
+  .detail-list-item .r { font-variant-numeric: tabular-nums; font-weight: 600; flex-shrink: 0; }
+  .detail-list-item .meta { font-size: 11px; color: #8e8e93; }
+
+  /* ── Empty state ── */
+  .empty {
+    color: #8e8e93; font-style: italic; text-align: center;
+    padding: 16px; font-size: 13px;
+  }
+
+  /* ── Small phones ── */
+  @media (max-width: 360px) {
     .tc-plate { font-size: 16px; }
-    .tc-profit { font-size: 16px; }
+    .tc-profit { font-size: 17px; }
+    .top-row h1 { font-size: 16px; }
   }
 </style>
 </head>
 <body>
 <div class="top">
   <div class="top-row">
-    <div>
-      <h1>🚛 THIRA Dashboard</h1>
-    </div>
+    <h1>🚛 THIRA Dashboard</h1>
     <div class="actions">
-      <button onclick="reload()" title="โหลดใหม่">🔄</button>
+      <button class="icon-btn" onclick="reload()" title="โหลดใหม่">🔄</button>
     </div>
   </div>
   <div class="period-bar">
-    <button class="nav-btn" onclick="changePeriod(-1)">◀</button>
-    <input id="period-input" type="text" placeholder="5.2/2026">
-    <button class="nav-btn" onclick="changePeriod(1)">▶</button>
-    <span style="opacity:0.7;font-size:12px;margin-left:4px" id="period-label"></span>
+    <button class="period-nav" onclick="changePeriod(-1)">◀</button>
+    <input id="period-input" class="period-input" type="text" inputmode="decimal" placeholder="5.2/2026">
+    <button class="period-nav" onclick="changePeriod(1)">▶</button>
   </div>
 </div>
 
@@ -168,11 +342,8 @@
   </a>
 </nav>
 
-<!-- Detail modal -->
 <div id="detail-overlay" class="detail-overlay" onclick="if(event.target===this)closeDetail()">
-  <div class="detail-sheet" id="detail-sheet">
-    <button class="detail-close" onclick="closeDetail()">✕</button>
-  </div>
+  <div class="detail-sheet" id="detail-sheet"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -189,6 +360,13 @@ const ants = ANTS_KEY ? supabase.createClient(ANTS_URL, ANTS_KEY) : null;
 
 const fmtBaht = (n, d='—') => (n == null || n === 0) ? d : Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
 const fmtBahtFull = (n, d='—') => (n == null || n === 0) ? d : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtBahtShort = (n, d='—') => {
+  if (n == null || n === 0) return d;
+  const v = Math.abs(n);
+  if (v >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
+  if (v >= 10_000) return Math.round(n/1000) + 'k';
+  return Number(n).toLocaleString('en-US', {maximumFractionDigits:0});
+};
 const fmtLiter = (n, d='—') => (n == null || n === 0) ? d : Math.round(Number(n)).toLocaleString('en-US');
 const fmtDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${y}`; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -200,7 +378,7 @@ function getCurrent() { const t=new Date(); return `${t.getMonth()+1}.${t.getDat
 function lastDay(y, m) { return new Date(y, m, 0).getDate(); }
 function parsePeriod(s) {
   const m = s.trim().match(/^(\d+)\.(\d)\/(\d{4})$/);
-  if (!m) throw new Error('รูปแบบรอบไม่ถูก');
+  if (!m) throw new Error('รูปแบบ "M.H/YYYY" เช่น 5.2/2026');
   const month=+m[1], half=+m[2], year=+m[3];
   const ld = lastDay(year, month);
   return {year, month, half, start: half===1?`${year}-${String(month).padStart(2,'0')}-01`:`${year}-${String(month).padStart(2,'0')}-16`, end: half===1?`${year}-${String(month).padStart(2,'0')}-15`:`${year}-${String(month).padStart(2,'0')}-${ld}`, halfLabel: half===1?`ครึ่งแรก`:`ครึ่งหลัง`};
@@ -291,57 +469,78 @@ function compute(truck, p, d) {
 
 function renderTruckCards(p, summaries) {
   const fleet = summaries.reduce((acc, s) => {
-    acc.totalBill += s.sum.totalBill;
-    acc.totalPaid += s.sum.totalPaid;
-    acc.pending += s.sum.totalPending;
-    acc.trips += s.sum.trips;
+    acc.totalBill += s.sum.totalBill; acc.totalPaid += s.sum.totalPaid;
+    acc.pending += s.sum.totalPending; acc.trips += s.sum.trips;
+    acc.driverPay += s.sum.driverFee;
     return acc;
-  }, {totalBill:0, totalPaid:0, pending:0, trips:0});
-  const pct = fleet.totalBill > 0 ? Math.round(fleet.totalPaid/fleet.totalBill*100) : 0;
-
-  document.getElementById('period-label').textContent = THAI_MONTHS_FULL[p.month].slice(0,3) + ' ' + (p.year+543);
+  }, {totalBill:0, totalPaid:0, pending:0, trips:0, driverPay:0});
 
   let html = `
+    <div class="section">📊 ภาพรวม — ${THAI_MONTHS_FULL[p.month]} ${p.year+543}</div>
     <div class="fleet-kpi">
-      <h3>📊 ภาพรวมทั้งฝูง ${p.month}.${p.half}/${p.year}</h3>
-      <div class="fleet-kpi-grid">
-        <div class="fleet-kpi-cell"><div class="label">เที่ยวรวม</div><div class="value">${fleet.trips}</div></div>
-        <div class="fleet-kpi-cell"><div class="label">วางบิลรวม</div><div class="value">${fmtBahtFull(fleet.totalBill)}</div></div>
-        <div class="fleet-kpi-cell paid"><div class="label">จ่ายแล้ว (${pct}%)</div><div class="value">${fmtBahtFull(fleet.totalPaid)}</div></div>
-        <div class="fleet-kpi-cell pending"><div class="label">ค้างชำระ</div><div class="value">${fmtBahtFull(fleet.pending)}</div></div>
+      <div class="fleet-grid">
+        <div class="fleet-cell">
+          <div class="label">เที่ยวรวม</div>
+          <div class="value">${fleet.trips} เที่ยว</div>
+        </div>
+        <div class="fleet-cell">
+          <div class="label">วางบิลรวม</div>
+          <div class="value">${fmtBaht(fleet.totalBill)}</div>
+        </div>
+        <div class="fleet-cell paid">
+          <div class="label">จ่ายแล้ว</div>
+          <div class="value">${fmtBaht(fleet.totalPaid)}</div>
+        </div>
+        <div class="fleet-cell pending">
+          <div class="label">ค้างชำระ</div>
+          <div class="value">${fmtBaht(fleet.pending)}</div>
+        </div>
       </div>
     </div>
-    <div class="section-label">🚛 รถ 6 คัน — แตะเพื่อดูรายละเอียด</div>
-    <div class="truck-cards">
+
+    <div class="section">🚛 รถ 6 คัน</div>
+    <div class="cards-wrap">
   `;
 
   for (const s of summaries) {
     const t = s.truck, sum = s.sum;
     const profitClass = sum.profit >= 0 ? 'pos' : 'neg';
     const profitSign = sum.profit >= 0 ? '+' : '';
-    const fuelStatus = sum.carryOut > 50 ? 'danger' : (sum.carryOut > 0 ? 'warn' : 'ok');
-    const fuelLabel = sum.carryOut > 0 ? `ค้างเติม ${fmtLiter(sum.carryOut)} ล.` : (sum.carryOut < 0 ? `เกิน ${fmtLiter(Math.abs(sum.carryOut))} ล.` : 'พอดี');
+    const fuelClass = sum.carryOut > 50 ? 'fuel-danger' : (sum.carryOut > 0 ? 'fuel-warn' : 'fuel-ok');
+    const fuelLabel = sum.carryOut > 0 ? `ค้าง ${fmtLiter(sum.carryOut)} ล.` :
+                       (sum.carryOut < 0 ? `เกิน ${fmtLiter(Math.abs(sum.carryOut))} ล.` : 'พอดี');
     html += `
       <div class="truck-card" onclick="showDetail('${t.plate}')">
         <div class="tc-header">
-          <div>
+          <div class="tc-info">
             <div class="tc-plate">${esc(t.plate)}</div>
             <div class="tc-driver">${esc(t.driver_name)}</div>
           </div>
-          <div class="tc-profit ${profitClass}">${profitSign}${fmtBahtFull(sum.profit)}</div>
+          <div>
+            <div class="tc-profit ${profitClass}">${profitSign}${fmtBaht(sum.profit)}</div>
+            <div class="tc-profit-label" style="text-align:right">กำไรรอบนี้</div>
+          </div>
         </div>
         <div class="tc-stats">
           <div class="tc-stat"><span class="v">${sum.trips}</span>เที่ยว</div>
-          <div class="tc-stat"><span class="v">${fmtBahtFull(sum.income)}</span>รายรับ</div>
-          <div class="tc-stat"><span class="v">${fmtBahtFull(sum.outcome)}</span>รายจ่าย</div>
+          <div class="tc-stat"><span class="v">${fmtBahtShort(sum.income)}</span>รายรับ</div>
+          <div class="tc-stat"><span class="v">${fmtBahtShort(sum.outcome)}</span>รายจ่าย</div>
         </div>
-        <div class="tc-bills">
-          <div class="tc-bill bill1">บิล1 ${sum.bill1PaidCnt}/${sum.bill1Cnt} • ${fmtBaht(sum.bill1)}</div>
-          <div class="tc-bill bill2">บิล2 ${sum.bill2PaidCnt}/${sum.bill2Cnt} • ${fmtBaht(sum.bill2)}</div>
+        <div class="tc-badges">
+          <div class="badge bill1">
+            <span class="name">บิล1 OGM</span>
+            <span>${sum.bill1PaidCnt}/${sum.bill1Cnt}</span>
+          </div>
+          <div class="badge bill2">
+            <span class="name">บิล2 อื่น</span>
+            <span>${sum.bill2PaidCnt}/${sum.bill2Cnt}</span>
+          </div>
         </div>
-        <div class="tc-fuel ${fuelStatus}">
-          <span>⛽ น้ำมัน</span>
-          <span>${fuelLabel}</span>
+        <div class="tc-fuel">
+          <div class="badge ${fuelClass}">
+            <span class="name">⛽ น้ำมัน</span>
+            <span>${fuelLabel}</span>
+          </div>
         </div>
       </div>
     `;
@@ -392,25 +591,31 @@ function showDetail(plate) {
   const t = s.truck, sum = s.sum, d = s.data;
   const profitClass = sum.profit >= 0 ? 'pos' : 'neg';
 
-  // Recent trips
   const tripList = d.trips.slice(0, 10).map(tr => {
     const pr = lookupPrice(tr.factory, tr.invoice_no);
     const fee = pr ? Number(pr.fee_driver||0) : 0;
+    const label = tr.factory || (tr.invoice_no||'').slice(0,12);
     return `<div class="detail-list-item">
-      <span>${fmtDate(tr.date_in)} ${esc((tr.factory || (tr.invoice_no||'').slice(0,8)).slice(0,18))}</span>
-      <span>${fmtBahtFull(fee)} บ.</span>
+      <div class="l">
+        <div>${esc(label.slice(0,22))}</div>
+        <div class="meta">${fmtDate(tr.date_in)} • ${esc((tr.invoice_no||'').slice(0,16))}</div>
+      </div>
+      <div class="r">${fmtBahtFull(fee)} บ.</div>
     </div>`;
-  }).join('') || '<div style="color:#888;text-align:center;padding:10px">— ไม่มีเที่ยว —</div>';
+  }).join('') || '<div class="empty">— ไม่มีเที่ยว —</div>';
 
-  // Other costs
   const otherCosts = d.outs.filter(o => o.category !== 'ค่าน้ำมัน' && !['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
   const otherList = otherCosts.slice(0, 10).map(o => `<div class="detail-list-item">
-    <span>${fmtDate(o.date)} ${esc(o.category)}${o.note ? ' — ' + esc(o.note.slice(0,20)) : ''}</span>
-    <span>${fmtBahtFull(o.amount)} บ.</span>
-  </div>`).join('') || '<div style="color:#888;text-align:center;padding:10px">— ไม่มี —</div>';
+    <div class="l">
+      <div>${esc(o.category)}</div>
+      <div class="meta">${fmtDate(o.date)}${o.note ? ' • ' + esc(o.note.slice(0,30)) : ''}</div>
+    </div>
+    <div class="r">${fmtBahtFull(o.amount)} บ.</div>
+  </div>`).join('') || '<div class="empty">— ไม่มี —</div>';
 
   const html = `
     <div class="detail-handle"></div>
+    <button class="detail-close" onclick="closeDetail()">✕</button>
     <div class="detail-header">
       <h2>🚛 ${esc(t.plate)}</h2>
       <div class="sub">${esc(t.driver_name)} • ${THAI_MONTHS_FULL[p.month]} ${p.year+543} ${p.halfLabel}</div>
@@ -421,29 +626,47 @@ function showDetail(plate) {
       <div class="detail-row"><span class="lbl">เที่ยวที่วิ่ง</span><span class="val">${sum.trips} เที่ยว</span></div>
       <div class="detail-row"><span class="lbl">รายรับ (net)</span><span class="val">${fmtBahtFull(sum.income)}</span></div>
       <div class="detail-row"><span class="lbl">รายจ่าย</span><span class="val">${fmtBahtFull(sum.outcome)}</span></div>
-      <div class="detail-row total"><span class="lbl">กำไรรอบนี้</span><span class="val ${profitClass}">${sum.profit>=0?'+':''}${fmtBahtFull(sum.profit)}</span></div>
+      <div class="detail-row total">
+        <span class="lbl">กำไรรอบนี้</span>
+        <span class="val ${profitClass}">${sum.profit>=0?'+':''}${fmtBahtFull(sum.profit)}</span>
+      </div>
     </div>
 
     <div class="detail-section">
       <h3>📋 วางบิล ANTS</h3>
-      <div class="detail-row"><span class="lbl">บิล 1 (OGM+KNT)</span><span class="val">${fmtBahtFull(sum.bill1)} • จ่าย ${sum.bill1PaidCnt}/${sum.bill1Cnt}</span></div>
-      <div class="detail-row"><span class="lbl">บิล 2 (อื่นๆ)</span><span class="val">${fmtBahtFull(sum.bill2)} • จ่าย ${sum.bill2PaidCnt}/${sum.bill2Cnt}</span></div>
-      <div class="detail-row total"><span class="lbl">ค้างชำระทั้งหมด</span><span class="val" style="color:#c05621">${fmtBahtFull(sum.totalPending)}</span></div>
+      <div class="detail-row">
+        <span class="lbl">บิล 1 (OGM+KNT)</span>
+        <span class="val">${fmtBahtFull(sum.bill1)} · จ่าย ${sum.bill1PaidCnt}/${sum.bill1Cnt}</span>
+      </div>
+      <div class="detail-row">
+        <span class="lbl">บิล 2 (อื่นๆ)</span>
+        <span class="val">${fmtBahtFull(sum.bill2)} · จ่าย ${sum.bill2PaidCnt}/${sum.bill2Cnt}</span>
+      </div>
+      <div class="detail-row total">
+        <span class="lbl">ค้างชำระทั้งหมด</span>
+        <span class="val neg">${fmtBahtFull(sum.totalPending)}</span>
+      </div>
     </div>
 
     <div class="detail-section">
       <h3>⛽ น้ำมัน</h3>
       <div class="detail-row"><span class="lbl">ค้างจากรอบก่อน</span><span class="val">${fmtLiter(sum.carryIn)} ล.</span></div>
-      <div class="detail-row"><span class="lbl">ใช้ตามเป้า (${sum.trips} เที่ยว)</span><span class="val">${fmtLiter(sum.tripTarget)} ล.</span></div>
-      <div class="detail-row"><span class="lbl">เติมจริงรอบนี้</span><span class="val">${fmtLiter(sum.refillL)} ล. • ${fmtBahtFull(sum.refillB)}</span></div>
-      <div class="detail-row total"><span class="lbl">${sum.carryOut>=0?'ค้างต้องเติม':'เติมเกิน'}</span><span class="val ${sum.carryOut>0?'neg':(sum.carryOut<0?'pos':'')}">${sum.carryOut>=0?'-':'+'}${fmtLiter(Math.abs(sum.carryOut))} ล.</span></div>
+      <div class="detail-row"><span class="lbl">ใช้ตามเป้า</span><span class="val">${fmtLiter(sum.tripTarget)} ล.</span></div>
+      <div class="detail-row"><span class="lbl">เติมจริง</span><span class="val">${fmtLiter(sum.refillL)} ล. · ${fmtBahtFull(sum.refillB)}</span></div>
+      <div class="detail-row total">
+        <span class="lbl">${sum.carryOut>=0?'ค้างต้องเติม':'เติมเกิน'}</span>
+        <span class="val ${sum.carryOut>0?'neg':(sum.carryOut<0?'pos':'')}">${sum.carryOut>=0?'−':'+'}${fmtLiter(Math.abs(sum.carryOut))} ล.</span>
+      </div>
     </div>
 
     <div class="detail-section">
-      <h3>💼 รวมต้องจ่ายคนขับ</h3>
-      <div class="detail-row"><span class="lbl">ค่าเที่ยว (${sum.trips} × PRICE)</span><span class="val">${fmtBahtFull(sum.tripFee)}</span></div>
+      <h3>💼 จ่ายคนขับรอบนี้</h3>
+      <div class="detail-row"><span class="lbl">ค่าเที่ยว (${sum.trips} เที่ยว)</span><span class="val">${fmtBahtFull(sum.tripFee)}</span></div>
       <div class="detail-row"><span class="lbl">เงินเดือน ${p.half===2?'(จ่ายครึ่งหลัง)':'(รอครึ่งหลัง)'}</span><span class="val">${fmtBahtFull(p.half===2?sum.baseSal:0)}</span></div>
-      <div class="detail-row total"><span class="lbl">รวมจ่ายคนขับ</span><span class="val">${fmtBahtFull(sum.driverFee)} บ.</span></div>
+      <div class="detail-row total">
+        <span class="lbl">รวมจ่าย</span>
+        <span class="val">${fmtBahtFull(sum.driverFee)} บ.</span>
+      </div>
     </div>
 
     <div class="detail-section">
@@ -452,12 +675,11 @@ function showDetail(plate) {
     </div>
 
     <div class="detail-section">
-      <h3>💸 ค่าใช้จ่ายอื่นๆ (${otherCosts.length})</h3>
+      <h3>💸 รายจ่ายอื่นๆ (${otherCosts.length})</h3>
       ${otherList}
     </div>
   `;
-  const sheet = document.getElementById('detail-sheet');
-  sheet.innerHTML = `<button class="detail-close" onclick="closeDetail()">✕</button>` + html;
+  document.getElementById('detail-sheet').innerHTML = html;
   document.getElementById('detail-overlay').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
@@ -468,9 +690,8 @@ function closeDetail() {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
-document.getElementById('period-input').addEventListener('keydown', e => { if (e.key === 'Enter') reload(); });
+document.getElementById('period-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.target.blur(); reload(); } });
 
-// Boot
 document.getElementById('period-input').value = getCurrent();
 reload();
 </script>
