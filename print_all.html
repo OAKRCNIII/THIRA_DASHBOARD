@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>THIRA — รีพอร์ตทั้งฝูง 6 คัน</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Sarabun', sans-serif; margin: 0; color: #222; background: #f0f2f5; }
+
+  .toolbar { background: white; padding: 14px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+             display: flex; gap: 16px; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
+  .toolbar h1 { font-size: 18px; color: #1e3a5f; margin: 0; }
+  .toolbar input { font-family: inherit; font-size: 15px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; width: 110px; }
+  .toolbar button { padding: 8px 16px; font-family: inherit; font-weight: 600; border: 0; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .btn-print { background: #1e3a5f; color: white; }
+  .btn-back { background: #6b7280; color: white; text-decoration: none; display: inline-block; }
+
+  .container { padding: 20px; max-width: 800px; margin: 0 auto; }
+  .page { background: white; padding: 24px 28px; margin-bottom: 14px; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+
+  /* SUMMARY PAGE */
+  .summary-header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color: white;
+    padding: 18px 24px; border-radius: 8px; margin: -8px -8px 16px -8px; }
+  .summary-header h1 { font-size: 24px; margin: 0; }
+  .summary-header .sub { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+  .sum-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  .sum-table thead th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+  .sum-table thead th.num { text-align: right; }
+  .sum-table tbody td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; font-variant-numeric: tabular-nums; }
+  .sum-table tbody td.num { text-align: right; }
+  .sum-table tbody td.plate { font-weight: 600; }
+  .sum-table tfoot td { padding: 11px 10px; background: #1e3a5f; color: white; font-weight: 700; font-size: 16px; }
+  .sum-table tfoot td.num { text-align: right; font-size: 18px; }
+
+  /* TRUCK PAGE */
+  .truck-header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color: white;
+    padding: 14px 20px; border-radius: 6px; margin: -8px -8px 14px -8px;
+    display: flex; justify-content: space-between; align-items: center; }
+  .truck-header h2 { font-size: 22px; margin: 0; }
+  .truck-header .sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .truck-header .period { font-size: 16px; font-weight: 600; }
+
+  table.main { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+  table.main thead th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
+  table.main thead th.num { text-align: right; }
+  table.main tbody td { padding: 5px 7px; border-top: 1px solid #eee; vertical-align: top; font-variant-numeric: tabular-nums; }
+  table.main tbody td.num { text-align: right; }
+  table.main tbody td.cat { font-weight: 600; font-size: 10px; writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px; width: 22px; }
+  .row-trip td { background: #fce4ec; } .row-trip td.cat { background: #f8bbd0; }
+  .row-extra td { background: #fef9c3; } .row-extra td.cat { background: #fde047; }
+  .row-fuel td { background: #ffe0b2; } .row-fuel td.cat { background: #ffcc80; }
+  .row-other td { background: #f0f0f0; } .row-other td.cat { background: #e0e0e0; }
+  .row-paid td { background: #ffffff; } .row-paid td.cat { background: #f5f5f5; }
+  table.main tfoot td { background: #1e3a5f; color: white; padding: 8px; font-weight: 700; }
+  small.muted { color: #888; font-size: 9px; }
+
+  .payslip { background: white; padding: 14px 20px; margin-top: 14px; border-radius: 8px; border: 2px solid #1e3a5f; page-break-inside: avoid; }
+  .payslip h2 { font-size: 15px; color: #1e3a5f; margin: 0 0 8px; }
+  .payslip-grid { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; font-size: 13px; }
+  .payslip-grid .lbl { color: #555; }
+  .payslip-grid .val { text-align: right; font-variant-numeric: tabular-nums; }
+  .payslip-grid .total { border-top: 2px solid #1e3a5f; margin-top: 6px; padding-top: 6px; font-size: 18px; font-weight: 700; color: #1e3a5f; }
+
+  @media print {
+    body { background: white; padding: 0; font-size: 11px; }
+    .toolbar { display: none; }
+    .container { padding: 0; max-width: none; }
+    .page { box-shadow: none; margin: 0; padding: 0; border-radius: 0; page-break-inside: avoid; page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+    .summary-header { border-radius: 0; margin: 0 0 10px 0; padding: 12px 16px; }
+    .summary-header h1 { font-size: 20px; }
+    .truck-header { border-radius: 0; margin: 0 0 8px 0; padding: 10px 14px; }
+    .truck-header h2 { font-size: 18px; }
+    .truck-header .sub, .truck-header .period { font-size: 11px; }
+
+    /* Compact main table for print */
+    table.main thead th { padding: 4px 6px; font-size: 10px; }
+    table.main tbody td { padding: 3px 6px; font-size: 10px; }
+    table.main tbody td.cat { padding: 3px; font-size: 9px; }
+    table.main tfoot td { padding: 5px 6px; font-size: 11px; }
+    table.main small.muted { font-size: 8px; }
+
+    /* Compact payslip */
+    .payslip { padding: 10px 14px; margin-top: 8px; page-break-inside: avoid; }
+    .payslip h2 { font-size: 13px; margin-bottom: 6px; }
+    .payslip-grid { font-size: 11px; gap: 2px 10px; }
+    .payslip-grid .total { font-size: 15px; padding-top: 4px; margin-top: 4px; }
+
+    /* Summary table compact */
+    .sum-table thead th { padding: 6px 8px; font-size: 11px; }
+    .sum-table tbody td { padding: 6px 8px; font-size: 11px; }
+    .sum-table tfoot td { padding: 8px; font-size: 13px; }
+    .sum-table tfoot td.num { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <h1>🖨️ รีพอร์ตทั้งฝูง 6 คัน</h1>
+  <label>รอบ:</label>
+  <input id="period-input" type="text" placeholder="5.2/2026">
+  <button class="btn-print" onclick="reload()">🔄 โหลดรอบนี้</button>
+  <button class="btn-print" onclick="window.print()">🖨️ พิมพ์</button>
+  <a class="btn-back" href="dashboard.html">← กลับ Dashboard</a>
+</div>
+
+<div class="container" id="report">กำลังโหลด...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
+const THAI_MONTHS = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const THAI_FULL = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const BILL1 = ['OGM', 'KNT'];
+
+const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });
+const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'ants' } });
+
+const fmtBaht = (n, dflt='—') => (n == null || n === 0) ? dflt : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtLiter = (n, dflt='—') => (n == null || n === 0) ? dflt : Math.round(Number(n)).toLocaleString('en-US');
+const fmtDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${y}`; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function getCurrentPeriod() {
+  const t = new Date();
+  return `${t.getMonth()+1}.${t.getDate() < 16 ? 1 : 2}/${t.getFullYear()}`;
+}
+function lastDay(y, m) { return new Date(y, m, 0).getDate(); }
+function parsePeriod(s) {
+  const m = s.match(/^(\d+)\.(\d)\/(\d{4})$/);
+  if (!m) throw new Error('รูปแบบรอบไม่ถูก');
+  const month = +m[1], half = +m[2], year = +m[3];
+  const ld = lastDay(year, month);
+  return {
+    year, month, half,
+    start: half === 1 ? `${year}-${String(month).padStart(2,'0')}-01` : `${year}-${String(month).padStart(2,'0')}-16`,
+    end: half === 1 ? `${year}-${String(month).padStart(2,'0')}-15` : `${year}-${String(month).padStart(2,'0')}-${ld}`,
+    halfLabel: half === 1 ? `ครึ่งแรก (1-15)` : `ครึ่งหลัง (16-${ld})`
+  };
+}
+
+let cache = {};
+
+async function loadCache() {
+  if (cache.trucks) return;
+  const [tRes, pRes, mRes] = await Promise.all([
+    ths.from('trucks').select('*').neq('plate', 'XX-XXXX').order('plate'),
+    ths.from('prices').select('*'),
+    ths.from('prefix_factory_map').select('*')
+  ]);
+  if (tRes.error) throw tRes.error;
+  if (pRes.error) throw pRes.error;
+  if (mRes.error) throw mRes.error;
+  cache.trucks = tRes.data;
+  cache.priceMap = {};
+  pRes.data.forEach(p => cache.priceMap[p.destination_code] = p);
+  cache.factoryMap = {};
+  mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
+}
+
+function lookupPrice(factory, invoice) {
+  const key = factory || (invoice || '').slice(0, 3);
+  return cache.priceMap[key] || null;
+}
+
+async function fetchTruckData(plate, p) {
+  const [trips, outs, incs, extras] = await Promise.all([
+    sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', p.start).lte('date_in', p.end).order('date_in'),
+    ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date'),
+    ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end),
+    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date')
+  ]);
+  return { trips: trips.data || [], outs: outs.data || [], incs: incs.data || [], extras: extras.data || [] };
+}
+
+function computePay(truck, p, data) {
+  const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
+  let tripFee = 0, tripTarget = 0;
+  for (const t of data.trips) {
+    const pr = lookupPrice(t.factory, t.invoice_no);
+    if (pr) {
+      tripFee += Number(pr.fee_driver || 0);
+      tripTarget += Number(pr[fuelCol] || 0);
+    }
+  }
+  const driverFeePaid = data.outs.filter(o => o.category === 'ค่าเที่ยวคนขับ').reduce((s,o)=>s+Number(o.amount),0);
+  const driverOT = data.outs.filter(o => o.category === 'ค่าล่วง').reduce((s,o)=>s+Number(o.amount),0);
+  const driverSalLogged = data.outs.filter(o => o.category === 'เงินเดือน').reduce((s,o)=>s+Number(o.amount),0);
+  const baseSal = Number(truck.monthly_salary || 0);
+  const salaryDue = p.half === 2 ? baseSal : 0;
+  const driverSalary = driverSalLogged > 0 ? driverSalLogged : salaryDue;
+  const payslipTotal = tripFee + driverOT + driverSalary;
+  return { tripFee, tripTarget, driverFeePaid, driverOT, driverSalary, baseSal, payslipTotal, tripCount: data.trips.length };
+}
+
+function renderSummaryPage(p, summaries) {
+  const periodLabel = `${THAI_FULL[p.month]} ${p.year + 543} — ${p.halfLabel}`;
+  let grandTotal = 0;
+  const rows = summaries.map(s => {
+    grandTotal += s.pay.payslipTotal;
+    return `<tr>
+      <td class="plate">${esc(s.truck.plate)}</td>
+      <td>${esc(s.truck.driver_name)}</td>
+      <td class="num">${s.pay.tripCount}</td>
+      <td class="num">${fmtBaht(s.pay.tripFee)}</td>
+      <td class="num">${s.pay.driverOT > 0 ? fmtBaht(s.pay.driverOT) : '—'}</td>
+      <td class="num">${s.pay.driverSalary > 0 ? fmtBaht(s.pay.driverSalary) : '—'}</td>
+      <td class="num"><strong>${fmtBaht(s.pay.payslipTotal)}</strong></td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="page">
+    <div class="summary-header">
+      <h1>📋 สรุปต้องโอนให้คนขับ — รอบ ${p.month}.${p.half}/${p.year}</h1>
+      <div class="sub">${periodLabel}</div>
+    </div>
+    <table class="sum-table">
+      <thead>
+        <tr>
+          <th>รถ</th><th>คนขับ</th>
+          <th class="num">เที่ยว</th>
+          <th class="num">ค่าเที่ยว</th>
+          <th class="num">ค่าล่วง</th>
+          <th class="num">เงินเดือน</th>
+          <th class="num">รวมต้องโอน</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr><td colspan="6">💼 รวมต้องโอนทั้งฝูง (6 คน)</td><td class="num">${fmtBaht(grandTotal)} บ.</td></tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:14px;font-size:12px;color:#666">
+      💡 รอบ .2 (ครึ่งหลังของเดือน) จะรวม เงินเดือน base • ใช้สำหรับโอนเงินเข้าบัญชีคนขับ
+    </div>
+  </div>
+  `;
+}
+
+function renderTruckPage(truck, p, data, pay) {
+  const periodLabel = `${THAI_FULL[p.month]} ${p.year + 543} — ${p.halfLabel}`;
+  const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
+
+  // Trip rows
+  const tripRows = data.trips.map(t => {
+    const pr = lookupPrice(t.factory, t.invoice_no);
+    const target = pr ? Number(pr[fuelCol] || 0) : 0;
+    const fee = pr ? Number(pr.fee_driver || 0) : 0;
+    const label = t.factory || `[${(t.invoice_no||'').slice(0,3)}] ${t.invoice_no || ''}`;
+    return `<tr class="row-trip">
+      <td class="cat">ค่าพิเศษ</td>
+      <td>${fmtDate(t.date_in)}</td>
+      <td>${esc(label.slice(0,28))}<br><small class="muted">${esc(t.invoice_no||'')} • ${esc(t.container_no||'')}</small></td>
+      <td class="num">${fmtLiter(target)}</td>
+      <td class="num">—</td>
+      <td class="num">${fmtBaht(fee)}</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+    </tr>`;
+  }).join('') || '<tr class="row-trip"><td class="cat">ค่าพิเศษ</td><td colspan="8" style="color:#888;text-align:center">— ไม่มีเที่ยวรอบนี้ —</td></tr>';
+
+  // Extra trips
+  const extraRows = data.extras.map(e => `<tr class="row-extra">
+    <td class="cat">พิเศษ</td>
+    <td>${fmtDate(e.date)}</td>
+    <td>🟡 ${esc(e.description)}${e.note ? '<br><small class="muted">'+esc(e.note)+'</small>' : ''}</td>
+    <td class="num">${fmtLiter(e.liters)}</td>
+    <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+  </tr>`).join('');
+
+  // Fuel rows
+  const refills = data.outs.filter(o => o.category === 'ค่าน้ำมัน');
+  const refillRows = refills.map(r => `<tr class="row-fuel">
+    <td class="cat">ค่าน้ำมัน</td>
+    <td>${fmtDate(r.date)}</td>
+    <td>${esc(r.note || 'เติมน้ำมัน')}</td>
+    <td class="num">${fmtLiter(r.liters)}</td>
+    <td class="num">${fmtBaht(r.amount)}</td>
+    <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+  </tr>`).join('') || '<tr class="row-fuel"><td class="cat">ค่าน้ำมัน</td><td colspan="8" style="color:#888;text-align:center">— ไม่มีการเติมน้ำมัน —</td></tr>';
+
+  // Other costs
+  const others = data.outs.filter(o => o.category !== 'ค่าน้ำมัน' && !['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
+  const otherRows = others.map(o => `<tr class="row-other">
+    <td class="cat">อื่นๆ</td>
+    <td>${fmtDate(o.date)}</td>
+    <td><strong>${esc(o.category)}</strong>${(o.note && o.note !== o.category) ? ' — ' + esc(o.note) : ''}</td>
+    <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+    <td class="num">${fmtBaht(o.amount)}</td>
+  </tr>`).join('');
+
+  // Driver paid
+  const paidRows = data.outs.filter(o => ['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category)).map(d => {
+    const amt = Number(d.amount);
+    return `<tr class="row-paid">
+      <td class="cat">จ่ายคน</td>
+      <td>${fmtDate(d.date)}</td>
+      <td>${esc(d.category)} — ${esc(d.note || 'บันทึกการจ่าย')}</td>
+      <td class="num">—</td><td class="num">—</td>
+      <td class="num">${d.category === 'ค่าเที่ยวคนขับ' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">${d.category === 'ค่าล่วง' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">${d.category === 'เงินเดือน' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">—</td>
+    </tr>`;
+  }).join('');
+
+  const refillL = refills.reduce((s,r) => s + Number(r.liters || 0), 0);
+  const refillB = refills.reduce((s,r) => s + Number(r.amount), 0);
+  const otherTotal = others.reduce((s,o) => s + Number(o.amount), 0);
+
+  return `
+  <div class="page">
+    <div class="truck-header">
+      <div>
+        <h2>🚛 ${esc(truck.plate)} — ${esc(truck.driver_name)}</h2>
+        <div class="sub">ใช้ลิตรชุดที่ ${truck.fuel_route} • เงินเดือน ${fmtBaht(pay.baseSal)}/เดือน</div>
+      </div>
+      <div style="text-align:right">
+        <div class="period">${THAI_MONTHS[p.month]} ${p.year + 543} ${p.month}.${p.half}</div>
+        <div class="sub">${p.halfLabel}</div>
+      </div>
+    </div>
+
+    <table class="main">
+      <thead><tr>
+        <th></th><th>วันที่</th><th>รายการ</th>
+        <th class="num">ลิตร</th><th class="num">บาท(น้ำมัน)</th>
+        <th class="num">ค่าเที่ยว</th><th class="num">ค่าล่วง</th><th class="num">เงินเดือน</th><th class="num">อื่นๆ</th>
+      </tr></thead>
+      <tbody>${tripRows}${extraRows}${refillRows}${otherRows}${paidRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">รวม ${esc(truck.driver_name)}</td>
+          <td class="num">—</td>
+          <td class="num">—</td>
+          <td class="num">${fmtBaht(pay.tripFee)}</td>
+          <td class="num">—</td>
+          <td class="num">—</td>
+          <td class="num">—</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="payslip">
+      <h2>💰 รวมต้องจ่ายให้ ${esc(truck.driver_name)} รอบนี้</h2>
+      <div class="payslip-grid">
+        <div class="lbl">ค่าเที่ยว (จาก ${pay.tripCount} เที่ยว × PRICE)</div><div class="val">${fmtBaht(pay.tripFee)}</div>
+        <div class="lbl">ค่าล่วง</div><div class="val">${pay.driverOT > 0 ? fmtBaht(pay.driverOT) : '—'}</div>
+        <div class="lbl">เงินเดือน ${p.half === 2 ? `(${fmtBaht(pay.baseSal)} ต่อเดือน — จ่ายครึ่งหลัง)` : '(ครึ่งแรก — รอจ่ายครึ่งหลัง)'}</div><div class="val">${pay.driverSalary > 0 ? fmtBaht(pay.driverSalary) : '—'}</div>
+        <div class="lbl">อื่นๆ ที่จ่ายคนขับ</div><div class="val">—</div>
+        <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(pay.payslipTotal)} บ.</div>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
+async function reload() {
+  try {
+    document.getElementById('report').innerHTML = '<div style="padding:30px;text-align:center;color:#888">กำลังโหลด...</div>';
+    const periodStr = document.getElementById('period-input').value.trim() || getCurrentPeriod();
+    document.getElementById('period-input').value = periodStr;
+    const p = parsePeriod(periodStr);
+    await loadCache();
+    const summaries = [];
+    for (const truck of cache.trucks) {
+      const data = await fetchTruckData(truck.plate, p);
+      const pay = computePay(truck, p, data);
+      summaries.push({ truck, data, pay });
+    }
+    let html = renderSummaryPage(p, summaries);
+    for (const s of summaries) {
+      html += renderTruckPage(s.truck, p, s.data, s.pay);
+    }
+    document.getElementById('report').innerHTML = html;
+  } catch (e) {
+    document.getElementById('report').innerHTML = `<div style="padding:30px;color:#c53030">❌ ${e.message}</div>`;
+    console.error(e);
+  }
+}
+
+// URL param support: print_all.html?period=5.2/2026
+const urlPeriod = new URLSearchParams(location.search).get('period');
+document.getElementById('period-input').value = urlPeriod || getCurrentPeriod();
+document.getElementById('period-input').addEventListener('keydown', e => { if (e.key === 'Enter') reload(); });
+reload();
+</script>
+</body>
+</html>

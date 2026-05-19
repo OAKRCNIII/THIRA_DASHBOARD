@@ -1,0 +1,25 @@
+# Generated reports
+report_*.html
+
+# Environment / secrets
+.env
+.env.local
+*.key
+secrets.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp

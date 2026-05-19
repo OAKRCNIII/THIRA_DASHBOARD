@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THIRA Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Sarabun', sans-serif; margin: 0; padding: 16px; background: #f0f2f5; color: #222; }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1, h2, h3 { margin: 0; }
+
+  /* ── Top toolbar ── */
+  .toolbar { background: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 16px;
+             display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+             box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .toolbar h1 { font-size: 22px; color: #1e3a5f; }
+  .picker { display: flex; gap: 6px; align-items: center; }
+  .picker label { font-size: 14px; color: #555; }
+  .picker input { font-family: inherit; font-size: 16px; padding: 6px 10px; border: 1px solid #ccc;
+                  border-radius: 6px; width: 70px; text-align: center; }
+  .picker input:focus { outline: 2px solid #2c5282; border-color: #2c5282; }
+  .picker button { font-family: inherit; padding: 6px 12px; border: 1px solid #ccc; background: white;
+                   border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .picker button:hover { background: #f5f5f5; }
+
+  /* ── Truck tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { padding: 10px 16px; background: white; border: 2px solid transparent; border-radius: 8px;
+         cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600;
+         box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .tab.active { border-color: #1e3a5f; color: #1e3a5f; background: #e3f2fd; }
+  .tab .plate { font-size: 15px; }
+  .tab .driver { font-size: 11px; color: #777; font-weight: 400; }
+
+  /* ── Status ── */
+  .status { padding: 10px 16px; background: #fff3cd; color: #856404; border-radius: 6px; margin-bottom: 12px; }
+  .error { padding: 10px 16px; background: #f8d7da; color: #721c24; border-radius: 6px; margin-bottom: 12px; }
+
+  /* ── Report (สไตล์เดียวกับ Python version) ── */
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+            color: white; padding: 18px 24px; border-radius: 12px 12px 0 0;
+            display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 26px; }
+  .header .driver { opacity: 0.85; font-size: 14px; margin-top: 2px; }
+  .header-r { text-align: right; }
+  .header-r .period { font-size: 20px; font-weight: 600; }
+  .header-r .period-sub { opacity: 0.85; font-size: 13px; }
+
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .panel { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .panel h3 { font-size: 15px; color: #555; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
+
+  .ledger { font-size: 13px; }
+  .ledger .line { display: flex; justify-content: space-between; padding: 3px 0; }
+  .ledger .line.subtotal { border-top: 1px solid #ccc; margin-top: 4px; padding-top: 6px; font-weight: 600; }
+  .ledger .warn { color: #c05621; }
+  .ledger .ok { color: #2f855a; }
+  .placeholder { color: #999; font-style: italic; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge-pending { background: #fef3c7; color: #92400e; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kpi { background: white; padding: 12px; border-radius: 6px; border-left: 4px solid #2c5282; }
+  .kpi .label { font-size: 11px; color: #666; }
+  .kpi .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .kpi.profit-pos { border-color: #2f855a; } .kpi.profit-pos .value { color: #2f855a; }
+  .kpi.profit-neg { border-color: #c53030; } .kpi.profit-neg .value { color: #c53030; }
+
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-top: 12px; }
+  thead th { background: #1e3a5f; color: white; padding: 9px 10px; font-size: 12px; text-align: left; }
+  thead th.num { text-align: right; }
+  tbody td { padding: 8px 10px; border-top: 1px solid #eee; font-size: 13px; vertical-align: top; }
+  tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td.cat { font-weight: 600; font-size: 11px; writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px; }
+  tbody td.empty { color: #999; font-style: italic; text-align: center; }
+  small.muted { color: #888; font-size: 10px; }
+
+  .row-trip td { background: #fce4ec; } .row-trip td.cat { background: #f8bbd0; }
+  .row-extra td { background: #fef9c3; } .row-extra td.cat { background: #fde047; }
+  .row-fuel td { background: #ffe0b2; } .row-fuel td.cat { background: #ffcc80; }
+  .row-other td { background: #f0f0f0; } .row-other td.cat { background: #e0e0e0; }
+  .row-paid td { background: #ffffff; } .row-paid td.cat { background: #f5f5f5; }
+  .del-btn { border: 0; background: #ef4444; color: white; font-weight: 700; cursor: pointer; padding: 0 6px; border-radius: 3px; font-size: 11px; vertical-align: middle; }
+  .del-btn:hover { background: #dc2626; }
+
+  /* Extra trip form */
+  .extra-form h3 { margin-bottom: 8px; font-size: 15px; color: #555; }
+  .extra-form-grid { display: grid; grid-template-columns: 130px 1fr 100px 1fr auto; gap: 8px; }
+  .extra-form-grid input { font-family: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
+  .extra-form-grid button { padding: 6px 16px; border: 0; border-radius: 4px; background: #1e3a5f; color: white; font-weight: 600; cursor: pointer; }
+  .extra-form-grid button:hover { background: #2c5282; }
+  /* INPUT sections (Excel-style) */
+  .input-sections { margin-top: 12px; display: grid; gap: 10px; }
+  .input-panel { background: white; padding: 12px 16px; border-radius: 8px; border-left: 5px solid #ccc; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .input-panel.input-fuel { border-left-color: #f59e0b; }
+  .input-panel.input-other { border-left-color: #6b7280; }
+  .input-panel.input-income { border-left-color: #10b981; }
+  .input-panel h3 { font-size: 15px; color: #555; margin-bottom: 8px; }
+  .input-table { width: 100%; border-collapse: collapse; background: transparent; box-shadow: none; }
+  .input-table thead th { background: #f3f4f6; color: #555; padding: 6px 8px; font-size: 12px; text-align: left; font-weight: 600; border: 1px solid #e5e7eb; }
+  .input-table tbody td { padding: 4px 6px; border: 1px solid #e5e7eb; background: transparent !important; }
+  .input-table input, .input-table select { font-family: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; width: 100%; box-sizing: border-box; }
+  .input-table button { font-family: inherit; padding: 6px 14px; border: 0; border-radius: 4px; color: white; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .input-fuel .input-table button { background: #f59e0b; }
+  .input-fuel .input-table button:hover { background: #d97706; }
+  .input-other .input-table button { background: #6b7280; }
+  .input-other .input-table button:hover { background: #4b5563; }
+  .input-income .input-table button { background: #10b981; }
+  .input-income .input-table button:hover { background: #059669; }
+  .batch-sum { margin-top: 8px; padding: 8px 14px; background: #f3f4f6; border-radius: 6px; text-align: right; font-size: 14px; color: #444; }
+  .batch-sum strong { color: #1e3a5f; font-size: 16px; }
+
+  .payslip { background: white; padding: 16px 24px; margin-top: 16px; border-radius: 12px; border: 2px solid #1e3a5f; }
+  .payslip h2 { font-size: 16px; color: #1e3a5f; margin-bottom: 10px; }
+  .payslip-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; font-size: 14px; }
+  .payslip-grid .lbl { color: #555; }
+  .payslip-grid .val { text-align: right; font-variant-numeric: tabular-nums; }
+  .payslip-grid .total { border-top: 2px solid #1e3a5f; margin-top: 6px; padding-top: 6px; font-size: 20px; font-weight: 700; color: #1e3a5f; }
+  .warn-msg { color: #c05621; font-weight: 600; margin-top: 6px; font-size: 13px; }
+  .ok-msg { color: #2f855a; font-weight: 600; margin-top: 6px; font-size: 13px; }
+
+  /* Billing panel */
+  .bills { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bill { padding: 12px 14px; border-radius: 8px; border: 1px solid #ddd; }
+  .bill.bill1 { background: #fff7e6; border-color: #f0c674; }
+  .bill.bill2 { background: #e6f3ff; border-color: #74a8d6; }
+  .bill-head { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 14px; }
+  .bill-count { font-size: 12px; color: #666; }
+  .bill-empty { color: #888; font-style: italic; font-size: 13px; padding: 8px 0; }
+  .bill-table { width: 100%; font-size: 12px; border-collapse: collapse; background: transparent; box-shadow: none; }
+  .bill-table td { padding: 4px 6px; border-top: 1px solid rgba(0,0,0,0.05); background: transparent !important; }
+  .bill-total { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.2); font-weight: 700; font-size: 14px; text-align: right; }
+  .bill-grand { margin-top: 12px; padding: 8px 12px; background: #1e3a5f; color: white; border-radius: 6px; text-align: right; font-size: 14px; }
+  .bill-grand strong { font-size: 17px; }
+  .bill-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; vertical-align: middle; }
+  .bill-tag.bill1 { background: #f0c674; color: #5b4500; }
+  .bill-tag.bill2 { background: #74a8d6; color: white; }
+  .pay-mark { display: inline-block; width: 18px; height: 18px; border-radius: 50%; text-align: center; line-height: 18px; font-weight: 700; font-size: 12px; background: #eee; color: #999; }
+  .pay-mark.paid { background: #34d399; color: white; }
+  .bill-table tr.paid td { opacity: 0.75; text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.3); }
+  .bill-table tr.paid td:first-child { text-decoration: none; opacity: 1; }
+
+  /* Fuel panel with tank gauge */
+  .fuel-panel { display: grid; grid-template-columns: 110px 1fr; gap: 16px; align-items: start; }
+  .tank-wrap { position: relative; }
+  .tank-svg { width: 100%; height: auto; max-height: 180px; }
+  .tank-label { text-align: center; margin-top: 4px; }
+  .tank-num { font-size: 22px; font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums; }
+  .tank-unit { font-size: 12px; font-weight: 400; color: #888; }
+  .tank-sub { font-size: 11px; color: #666; }
+  .tank-pct { font-size: 11px; font-weight: 600; color: #f59e0b; margin-top: 2px; }
+  .fuel-stats { font-size: 13px; }
+  .fuel-stat-row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .fuel-stat-row .lbl { color: #555; }
+  .fuel-stat-row .val { font-variant-numeric: tabular-nums; text-align: right; }
+  .fuel-stat-row.total { border-top: 1px solid #ccc; padding-top: 6px; margin-top: 4px; font-weight: 600; color: #1e3a5f; }
+  .fuel-result { margin-top: 10px; padding: 10px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .fuel-result.pending { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
+  .fuel-result.over { background: #fee2e2; border: 1px solid #dc2626; color: #991b1b; }
+  .fuel-result.ok { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
+  .fuel-result .result-label { font-weight: 600; font-size: 14px; }
+  .fuel-result .result-num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Overview view */
+  .tab.tab-overview { background: #e0f2fe; }
+  .tab.tab-overview.active { border-color: #0369a1; color: #0369a1; background: #bae6fd; }
+  .tab.tab-input { background: #fef3c7; }
+  .tab.tab-input.active { border-color: #c05621; color: #c05621; background: #fed7aa; }
+  .tab.tab-income { background: #d1fae5; }
+  .tab.tab-income.active { border-color: #065f46; color: #065f46; background: #a7f3d0; }
+  .tab.tab-monthly { background: #f3e8ff; }
+  .tab.tab-monthly.active { border-color: #7c3aed; color: #7c3aed; background: #ddd6fe; }
+
+  /* Monthly profit table */
+  .monthly-table { width: 100%; background: white; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .monthly-table thead th { background: #1e3a5f; color: white; padding: 8px 10px; font-size: 12px; text-align: left; white-space: nowrap; }
+  .monthly-table thead th.num { text-align: right; }
+  .monthly-table tbody td { padding: 8px 10px; border-top: 1px solid #eee; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .monthly-table tbody td.num { text-align: right; }
+  .monthly-table tfoot td { padding: 10px; }
+  .monthly-table .profit-pos { color: #2f855a; }
+  .monthly-table .profit-neg { color: #c05621; }
+  .monthly-table .muted { color: #cbd5e1; }
+  .monthly-table .year-total { background: #f3f4f6; }
+  .monthly-summary .kpi.profit-pos { border-left-color: #2f855a; }
+  .monthly-summary .kpi.profit-pos .value { color: #2f855a; }
+  .monthly-summary .kpi.profit-neg { border-left-color: #c53030; }
+  .monthly-summary .kpi.profit-neg .value { color: #c53030; }
+  .overview-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 14px 0; }
+  .overview-kpis .kpi { padding: 14px; }
+  .overview-kpis .kpi .value { font-size: 22px; }
+  .overview-table { width: 100%; }
+  .overview-table tbody tr:hover { background: #fff7e6 !important; }
+  .overview-table tbody tr:hover td { background: #fff7e6 !important; }
+  .progress-bar { height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-bottom: 2px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #34d399, #10b981); transition: width 0.3s; }
+  small.warn { color: #c05621; }
+
+  /* Delete confirm modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex !important;
+    align-items: center; justify-content: center; z-index: 9999; animation: fadeIn 0.15s; }
+  .modal-overlay[style*="display:none"], .modal-overlay[style*="display: none"] { display: none !important; }
+  @keyframes fadeIn { from {opacity:0} to {opacity:1} }
+  .modal-box { background: white; padding: 28px 32px; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    width: 380px; max-width: 90%; text-align: center; animation: popIn 0.2s; }
+  @keyframes popIn { from {transform:scale(0.9);opacity:0} to {transform:scale(1);opacity:1} }
+  .modal-icon { font-size: 42px; margin-bottom: 6px; }
+  .modal-title { font-size: 20px; color: #1e3a5f; margin-bottom: 4px; }
+  .modal-msg { color: #666; font-size: 14px; margin-bottom: 16px; }
+  #modal-pin { font-family: inherit; font-size: 22px; letter-spacing: 0.4em; text-align: center;
+    width: 100%; padding: 12px 14px; border: 2px solid #d1d5db; border-radius: 8px;
+    box-sizing: border-box; transition: border-color 0.15s; }
+  #modal-pin:focus { outline: none; border-color: #dc2626; }
+  .modal-error { color: #dc2626; font-size: 13px; font-weight: 600; margin-top: 8px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-actions button { flex: 1; padding: 10px; border: 0; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600; transition: background 0.15s; }
+  .btn-cancel { background: #e5e7eb; color: #374151; }
+  .btn-cancel:hover { background: #d1d5db; }
+  .btn-confirm { background: #dc2626; color: white; }
+  .btn-confirm:hover { background: #b91c1c; }
+
+  .footer { text-align: center; color: #888; font-size: 12px; margin-top: 20px; }
+
+  /* Print-only report toolbar */
+  .report-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 8px 0; }
+  .btn-print { padding: 8px 16px; background: #6b7280; color: white; border: 0; border-radius: 6px;
+    cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600; }
+  .btn-print:hover { background: #4b5563; }
+
+  @media print {
+    body { background: white; padding: 0; margin: 0; }
+    .toolbar, .tabs, .footer, .report-actions { display: none !important; }
+    .panels, .billing-panel, .goto-input-hint, .extra-form, .input-sections, .recent-sections { display: none !important; }
+    .header { border-radius: 0; }
+    table { box-shadow: none !important; }
+    .payslip { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="toolbar">
+    <h1>🚛 THIRA Dashboard</h1>
+    <div class="picker">
+      <label>รอบ:</label>
+      <input id="period-input" type="text" placeholder="เช่น 4.2/2026" style="width:110px">
+      <button onclick="changePeriod(-1)">◀ ก่อน</button>
+      <button onclick="changePeriod(+1)">ถัดไป ▶</button>
+      <button onclick="reload()" title="โหลดใหม่">🔄</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="status" class="status" style="display:none">กำลังโหลด...</div>
+  <div id="error" class="error" style="display:none"></div>
+  <div id="report"></div>
+
+  <!-- Delete confirm modal -->
+  <div id="delete-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-icon">🔒</div>
+      <h2 class="modal-title">ยืนยันการลบ</h2>
+      <p class="modal-msg">กรุณาใส่รหัสยืนยันเพื่อลบข้อมูลนี้</p>
+      <input type="password" id="modal-pin" placeholder="••••••" autocomplete="off" inputmode="numeric" maxlength="20">
+      <div id="modal-error" class="modal-error" style="display:none">❌ รหัสไม่ถูกต้อง</div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeDeleteModal(false)">ยกเลิก</button>
+        <button class="btn-confirm" type="button" onclick="closeDeleteModal(true)">ยืนยันการลบ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Live data from Supabase  •  ANTS·THIRA Logistics
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ─── Config ────────────────────────────────────────────────
+const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
+// ANTS billing project (อีก project) — ใช้เช็คว่าวางบิลแล้ว ANTS จ่ายหรือยัง
+// ⚠️ ANTS_KEY เก็บใน localStorage (prompt ครั้งแรก) — ไม่ commit ลง repo
+const ANTS_URL = 'https://ywslgrusflfuxtrtvlfu.supabase.co';
+let ANTS_KEY = localStorage.getItem('ANTS_KEY') || '';
+if (!ANTS_KEY) {
+  ANTS_KEY = prompt('🔑 ใส่ ANTS Supabase key (เก็บไว้ใน browser เครื่องนี้เท่านั้น):\n— ถามคุณ RCN/INK ถ้าไม่รู้ —') || '';
+  if (ANTS_KEY) localStorage.setItem('ANTS_KEY', ANTS_KEY);
+}
+const TRUCK_PLATES = ['71-9538', '72-1620', '72-2237', '72-2420', '72-2953', '72-3148'];
+const THAI_MONTHS = ['', 'ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const THAI_MONTHS_FULL = ['', 'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const BILL1_PREFIXES = ['OGM', 'KNT'];  // invoice_no starts with these → Bill 1 (OGM&KNT)
+const OUTCOME_CATEGORIES = [
+  'ค่าน้ำมัน',          // ต้องกรอก ลิตร + บาท
+  'ค่าเที่ยวคนขับ',     // บาท
+  'ค่าล่วง',
+  'เงินเดือน',
+  'ค่ายาง',
+  'เช็คระยะ',
+  'ค่าเคลียหมวดกร',
+  'ค่าเคลียจ่าแชมป์',
+  'บุญช่วย',
+  'ประกัน',
+  'สุวิทย์',
+  'ร้อยละ4',
+  'บัญชี',
+  'อื่นๆ',
+];
+
+// ─── State ─────────────────────────────────────────────────
+let sb = null;
+let cache = { trucks: null, prices: null, priceMap: null, factoryMap: null, priceSets: null };
+let currentView = 'overview';   // 'overview' | 'truck'
+let currentPlate = '72-2420';
+let currentPeriod = '4.2';
+let currentYear = 2026;
+
+// ─── Init ──────────────────────────────────────────────────
+const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: { schema: 'thira' }
+});
+const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: { schema: 'ants' }
+});
+// ANTS billing project client
+const ants = supabase.createClient(ANTS_URL, ANTS_KEY);
+
+// ─── Utility ───────────────────────────────────────────────
+const fmtBaht = (n, dflt='—') => (n == null || n === 0) ? dflt : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtLiter = (n, dflt='—') => (n == null || n === 0) ? dflt : Math.round(Number(n)).toLocaleString('en-US');
+const fmtThaiDate = (iso) => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${y}`; };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function lastDayOfMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
+// parse "4.2/2026" → {year:2026, month:4, half:2, ...}
+// allow "4.2" → use default year (currentYear)
+function parsePeriod(periodStr) {
+  const s = String(periodStr).trim();
+  const match = s.match(/^(\d+)\.(\d)(?:\/(\d{4}))?$/);
+  if (!match) throw new Error('รูปแบบรอบไม่ถูก เช่น "4.2/2026"');
+  const m = +match[1], h = +match[2], y = match[3] ? +match[3] : currentYear;
+  if (m < 1 || m > 12) throw new Error('เดือนต้องอยู่ระหว่าง 1-12');
+  if (![1, 2].includes(h)) throw new Error('ครึ่งต้องเป็น 1 หรือ 2');
+  if (y < 2020 || y > 2100) throw new Error('ปีไม่ถูกต้อง');
+  const lastDay = lastDayOfMonth(y, m);
+  const start = h === 1 ? `${y}-${String(m).padStart(2,'0')}-01` : `${y}-${String(m).padStart(2,'0')}-16`;
+  const end   = h === 1 ? `${y}-${String(m).padStart(2,'0')}-15` : `${y}-${String(m).padStart(2,'0')}-${lastDay}`;
+  const halfLabel = h === 1 ? 'ครึ่งแรก (1-15)' : `ครึ่งหลัง (16-${lastDay})`;
+  return { year: y, month: m, half: h, start, end, halfLabel };
+}
+
+function formatPeriod(year, month, half) { return `${month}.${half}/${year}`; }
+
+function lookupPrice(priceMap, factory, invoice) {
+  const key = factory || (invoice || '').slice(0, 3);
+  return { price: priceMap[key] || null, key };
+}
+
+// Parse Thai date from freight_price_sets.name field
+// "อัพเดต 17 มีนาคม 2569" → "2026-03-17"
+// "วันอังคารที่ 7 เมษายน 2569" → "2026-04-07"
+function parseThaiDate(text) {
+  const m = String(text || '').match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+  if (!m) return null;
+  const day = +m[1];
+  const thaiMonth = m[2].trim();
+  const thaiYear = +m[3];
+  const monthIdx = THAI_MONTHS_FULL.indexOf(thaiMonth);
+  if (monthIdx < 1) return null;
+  const year = thaiYear > 2500 ? thaiYear - 543 : thaiYear;
+  return `${year}-${String(monthIdx).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+// หา price set ที่ effective ก่อน/เท่ากับวันที่นี้ (ล่าสุด)
+function findActivePriceSet(priceSets, dateISO) {
+  // priceSets sorted desc by effective_date
+  for (const ps of priceSets) {
+    if (ps.effective_date && ps.effective_date <= dateISO) return ps;
+  }
+  return null;  // ถ้าวันที่เก่ากว่า set แรกสุด — ไม่มี price
+}
+
+// ดึงราคาวางบิลของเที่ยว: factory → freight_price_sets[factory_name]
+function billPriceForTrip(trip, factoryMap, priceSets) {
+  // หา factory_name ใน freight_price_sets keys
+  const code = trip.factory || (trip.invoice_no || '').slice(0, 3);
+  const factoryName = factoryMap[code] || code;  // fallback ใช้ค่าเดิม
+  const ps = findActivePriceSet(priceSets, trip.date_in);
+  if (!ps || !ps.prices) return { amount: 0, factoryName, priceSet: null };
+  const amt = +(ps.prices[factoryName] || 0);
+  return { amount: amt, factoryName, priceSet: ps };
+}
+
+function isBill1(trip) {
+  const inv = (trip.invoice_no || '').toUpperCase();
+  return BILL1_PREFIXES.some(p => inv.startsWith(p));
+}
+
+// ─── Data fetch ────────────────────────────────────────────
+async function loadCache() {
+  if (cache.trucks) return;
+  setStatus('โหลดข้อมูล master...');
+  // separate client for public schema (default)
+  const sbpub = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const [tRes, pRes, mRes, fRes, frRes] = await Promise.all([
+    ths.from('trucks').select('*').order('plate'),
+    ths.from('prices').select('*'),
+    ths.from('prefix_factory_map').select('*'),
+    sbpub.from('freight_price_sets').select('id,name,prices,updated_at'),
+    ths.from('fuel_rates').select('*').order('effective_date', {ascending:false}).limit(1)
+  ]);
+  if (tRes.error) throw tRes.error;
+  if (pRes.error) throw pRes.error;
+  if (mRes.error) throw mRes.error;
+  if (fRes.error) throw fRes.error;
+  if (frRes.error) throw frRes.error;
+  cache.fuelRate = frRes.data.length > 0 ? Number(frRes.data[0].baht_per_liter) : 41.81;
+  cache.trucks = tRes.data;
+  cache.prices = pRes.data;
+  cache.priceMap = {};
+  pRes.data.forEach(p => cache.priceMap[p.destination_code] = p);
+  cache.factoryMap = {};
+  mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
+  // Parse effective_date from name; sort desc
+  cache.priceSets = fRes.data
+    .map(ps => ({ ...ps, effective_date: parseThaiDate(ps.name) }))
+    .filter(ps => ps.effective_date)
+    .sort((a, b) => b.effective_date.localeCompare(a.effective_date));
+  setStatus(null);
+}
+
+async function fetchTruckPeriod(plate, start, end, year, month, half) {
+  const [trips, outs, incs, fp, extras] = await Promise.all([
+    sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', start).lte('date_in', end).order('date_in'),
+    ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end).order('date'),
+    ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end),
+    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', year).eq('month', month).eq('half', half).maybeSingle(),
+    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end).order('date')
+  ]);
+  if (trips.error) throw trips.error;
+  if (outs.error)  throw outs.error;
+  if (incs.error)  throw incs.error;
+  if (fp.error)    throw fp.error;
+  if (extras.error) throw extras.error;
+
+  // หา paid status จาก ANTS Supabase: lookup ตาม container_no list
+  const containerNos = trips.data.map(t => t.container_no).filter(Boolean);
+  let billStatusByCnt = {};
+  if (containerNos.length > 0) {
+    try {
+      const billsRes = await ants.from('transport_bills')
+        .select('container_no,invoice_no,bill_no,price,source,is_paid,bill_date')
+        .in('container_no', containerNos);
+      if (!billsRes.error) {
+        billsRes.data.forEach(b => {
+          billStatusByCnt[b.container_no] = b;
+        });
+      }
+    } catch (e) { console.warn('ANTS fetch failed (continue without paid status):', e); }
+  }
+
+  return { trips: trips.data, outs: outs.data, incs: incs.data, fp: fp.data, billStatusByCnt, extras: extras.data };
+}
+
+// ─── Render ───────────────────────────────────────────────
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  const overviewTab = `
+    <button class="tab tab-overview ${currentView === 'overview' ? 'active' : ''}" onclick="selectOverview()">
+      <div class="plate">📊 รวม 6 คัน</div>
+      <div class="driver">ภาพรวมฝูง</div>
+    </button>`;
+  const inputTab = `
+    <button class="tab tab-input ${currentView === 'input' ? 'active' : ''}" onclick="selectInput()">
+      <div class="plate">✏️ บันทึกรายจ่าย</div>
+      <div class="driver">น้ำมัน / อื่นๆ / เที่ยวพิเศษ</div>
+    </button>`;
+  const incomeTab = `
+    <button class="tab tab-income ${currentView === 'income' ? 'active' : ''}" onclick="selectIncomeInput()">
+      <div class="plate">💰 บันทึกรายรับ</div>
+      <div class="driver">บิล 1 / บิล 2</div>
+    </button>`;
+  const monthlyTab = `
+    <a class="tab tab-monthly" href="monthly.html" style="text-decoration:none;display:inline-block">
+      <div class="plate">📈 กำไรรายเดือน</div>
+      <div class="driver">เปิดหน้าใหม่</div>
+    </a>`;
+  const truckTabs = cache.trucks
+    .filter(t => t.plate !== 'XX-XXXX')
+    .map(t => `
+      <button class="tab ${currentView === 'truck' && t.plate === currentPlate ? 'active' : ''}" onclick="selectTruck('${t.plate}')">
+        <div class="plate">${esc(t.plate)}</div>
+        <div class="driver">${esc(t.driver_name)}</div>
+      </button>
+    `).join('');
+  tabs.innerHTML = overviewTab + inputTab + incomeTab + monthlyTab + truckTabs;
+}
+
+function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extras) {
+  const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
+  extras = extras || [];
+  let tripTarget = 0, tripFee = 0;
+  let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0;
+  let bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
+  for (const t of trips) {
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no);
+    if (price) {
+      tripTarget += Number(price[fuelCol] || 0);
+      tripFee += Number(price.fee_driver || 0);
+    }
+    const antsBill = billStatusByCnt[t.container_no] || null;
+    const isPaid = !!(antsBill && antsBill.bill_no);
+    const billInfo = billPriceForTrip(t, cache.factoryMap, cache.priceSets);
+    const amt = antsBill && antsBill.price ? Number(antsBill.price) : billInfo.amount;
+    if (isBill1(t)) {
+      bill1 += amt; bill1Cnt++;
+      if (isPaid) { bill1Paid += amt; bill1PaidCnt++; }
+    } else {
+      bill2 += amt; bill2Cnt++;
+      if (isPaid) { bill2Paid += amt; bill2PaidCnt++; }
+    }
+  }
+  const refills = outs.filter(o => o.category === 'ค่าน้ำมัน');
+  const refillL = refills.reduce((s, o) => s + Number(o.liters || 0), 0);
+  const refillB = refills.reduce((s, o) => s + Number(o.amount), 0);
+  const extraL = extras.reduce((s, e) => s + Number(e.liters || 0), 0);
+  const fuelVar = refillL - tripTarget;
+  // คำนวณยอดที่ต้องยกไปรอบหน้า (ค้าง — positive = หนี้, negative = credit)
+  const carryIn = fp ? Number(fp.opening_liters || 0) : 0;
+  const bonus = fp ? Number(fp.bonus_liters || 0) : 0;
+  const required = carryIn + tripTarget + extraL;
+  const totalRefill = refillL + bonus;
+  const carryOut = required - totalRefill;  // positive = ค้าง, negative = credit
+  return {
+    trips: trips.length,
+    bill1, bill2, bill1Paid, bill2Paid,
+    bill1Cnt, bill2Cnt, bill1PaidCnt, bill2PaidCnt,
+    bill1Pending: bill1 - bill1Paid, bill2Pending: bill2 - bill2Paid,
+    totalBill: bill1 + bill2,
+    totalPaid: bill1Paid + bill2Paid,
+    totalPending: (bill1 - bill1Paid) + (bill2 - bill2Paid),
+    tripFee, tripTarget, extraL, refillL, refillB, fuelVar,
+    carryIn, carryOut,
+    reviewed: fp ? !!fp.reviewed : false,
+  };
+}
+
+function renderOverview(p, allData) {
+  // Compute summaries
+  const rows = allData.map(d => ({
+    truck: d.truck,
+    sum: computeTruckSummary(d.truck, d.trips, d.outs, d.incs, d.fp, d.billStatusByCnt || {}, d.extras || [])
+  }));
+  // Totals
+  const total = rows.reduce((acc, r) => {
+    acc.trips += r.sum.trips;
+    acc.bill1 += r.sum.bill1;  acc.bill2 += r.sum.bill2;
+    acc.bill1Paid += r.sum.bill1Paid;  acc.bill2Paid += r.sum.bill2Paid;
+    acc.bill1Cnt += r.sum.bill1Cnt;    acc.bill2Cnt += r.sum.bill2Cnt;
+    acc.bill1PaidCnt += r.sum.bill1PaidCnt; acc.bill2PaidCnt += r.sum.bill2PaidCnt;
+    acc.totalBill += r.sum.totalBill; acc.totalPaid += r.sum.totalPaid; acc.totalPending += r.sum.totalPending;
+    acc.refillL += r.sum.refillL; acc.refillB += r.sum.refillB; acc.tripTarget += r.sum.tripTarget;
+    acc.carryOut += r.sum.carryOut;
+    return acc;
+  }, {trips:0, bill1:0, bill2:0, bill1Paid:0, bill2Paid:0, bill1Cnt:0, bill2Cnt:0, bill1PaidCnt:0, bill2PaidCnt:0, totalBill:0, totalPaid:0, totalPending:0, refillL:0, refillB:0, tripTarget:0, carryOut:0});
+
+  const periodLabel = `${THAI_MONTHS[p.month]} ${p.year + 543}  รอบ ${p.month}.${p.half}`;
+  const tableRows = rows.map(r => {
+    const pct = r.sum.totalBill > 0 ? Math.round(r.sum.totalPaid / r.sum.totalBill * 100) : 0;
+    return `<tr onclick="selectTruck('${r.truck.plate}')" style="cursor:pointer">
+      <td><strong>${esc(r.truck.plate)}</strong><br><small class="muted">${esc(r.truck.driver_name)}</small></td>
+      <td class="num">${r.sum.trips}</td>
+      <td class="num">
+        ${fmtBaht(r.sum.bill1)}<br>
+        <small class="muted">${r.sum.bill1PaidCnt}/${r.sum.bill1Cnt} เที่ยว</small>
+      </td>
+      <td class="num">
+        ${fmtBaht(r.sum.bill2)}<br>
+        <small class="muted">${r.sum.bill2PaidCnt}/${r.sum.bill2Cnt} เที่ยว</small>
+      </td>
+      <td class="num"><strong>${fmtBaht(r.sum.totalBill)}</strong></td>
+      <td class="num" style="color:#2f855a">${fmtBaht(r.sum.totalPaid)}</td>
+      <td class="num" style="color:#c05621;font-weight:600">${r.sum.totalPending > 0 ? fmtBaht(r.sum.totalPending) : '—'}</td>
+      <td class="num">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <small>${pct}%</small>
+      </td>
+      <td class="num">${
+        r.sum.carryOut > 0.01
+          ? `<span style="color:#c05621;font-weight:600">ค้าง ${fmtLiter(r.sum.carryOut)} ล.</span>`
+          : r.sum.carryOut < -0.01
+            ? `<span style="color:#2f855a;font-weight:600">เกิน ${fmtLiter(Math.abs(r.sum.carryOut))} ล.</span>`
+            : '<span style="color:#888">— ตรง —</span>'
+      }</td>
+    </tr>`;
+  }).join('');
+
+  const totalPct = total.totalBill > 0 ? Math.round(total.totalPaid / total.totalBill * 100) : 0;
+
+  return `
+    <div class="header">
+      <div>
+        <h1>📊 ภาพรวมทั้งฝูง</h1>
+        <div class="driver">${rows.length} คัน • คลิกแต่ละแถวเพื่อดูรายละเอียด</div>
+      </div>
+      <div class="header-r">
+        <div class="period">${periodLabel}</div>
+        <div class="period-sub">${p.halfLabel}</div>
+      </div>
+    </div>
+
+    <div class="overview-kpis">
+      <div class="kpi"><div class="label">เที่ยวรวม</div><div class="value">${total.trips}</div></div>
+      <div class="kpi"><div class="label">วางบิลรวม</div><div class="value">${fmtBaht(total.totalBill)}</div></div>
+      <div class="kpi profit-pos"><div class="label">จ่ายแล้ว</div><div class="value">${fmtBaht(total.totalPaid)}</div></div>
+      <div class="kpi profit-neg"><div class="label">ค้างชำระ</div><div class="value">${fmtBaht(total.totalPending)}</div></div>
+      <div class="kpi"><div class="label">% จ่ายแล้ว</div><div class="value">${totalPct}%</div></div>
+    </div>
+
+    <div class="close-fleet-bar" style="margin:12px 0;padding:12px 16px;background:#fff;border-radius:8px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+      <div>
+        <strong>⛽ ปิดรอบทั้งฝูง</strong>
+        <span style="color:#666;margin-left:8px">ยกยอดน้ำมันจาก ${p.month}.${p.half}/${p.year} ไปเป็น opening ของ ${nextPeriodLabel(p)}</span>
+      </div>
+      <button onclick="closeFleetPeriod(${p.year}, ${p.month}, ${p.half})"
+        style="padding:8px 18px;background:#2563eb;color:white;border:0;border-radius:6px;cursor:pointer;font-weight:600">
+        🔄 ปิดรอบ + ยกยอดทั้ง 6 คัน
+      </button>
+    </div>
+
+    <div class="close-fleet-bar" style="margin:12px 0;padding:12px 16px;background:#fff;border-radius:8px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+      <div>
+        <strong>🖨️ ออกรีพอร์ตทั้งฝูง</strong>
+        <span style="color:#666;margin-left:8px">หน้าแรก = สรุปต้องโอนคนขับ + 6 หน้าถัดมา = รายคัน — พิมพ์/PDF</span>
+      </div>
+      <a href="print_all.html?period=${p.month}.${p.half}/${p.year}" target="_blank"
+        style="padding:8px 18px;background:#1e3a5f;color:white;border:0;border-radius:6px;cursor:pointer;font-weight:600;text-decoration:none">
+        🖨️ ออกรีพอร์ต 6 คัน
+      </a>
+    </div>
+
+    <table class="overview-table">
+      <thead>
+        <tr>
+          <th>รถ / คนขับ</th>
+          <th class="num">เที่ยว</th>
+          <th class="num">บิล 1 (OGM+KNT)</th>
+          <th class="num">บิล 2 (อื่นๆ)</th>
+          <th class="num">รวมวางบิล</th>
+          <th class="num">จ่ายแล้ว</th>
+          <th class="num">ค้าง</th>
+          <th class="num">% จ่าย</th>
+          <th class="num">น้ำมัน<br>คงค้างเติม</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+      <tfoot>
+        <tr style="background:#1e3a5f;color:white;font-weight:700;">
+          <td style="padding:12px">รวมทั้งฝูง</td>
+          <td class="num" style="padding:12px">${total.trips}</td>
+          <td class="num" style="padding:12px">${fmtBaht(total.bill1)}<br><small style="opacity:0.7;font-weight:400">${total.bill1PaidCnt}/${total.bill1Cnt}</small></td>
+          <td class="num" style="padding:12px">${fmtBaht(total.bill2)}<br><small style="opacity:0.7;font-weight:400">${total.bill2PaidCnt}/${total.bill2Cnt}</small></td>
+          <td class="num" style="padding:12px">${fmtBaht(total.totalBill)}</td>
+          <td class="num" style="padding:12px;color:#a7f3d0">${fmtBaht(total.totalPaid)}</td>
+          <td class="num" style="padding:12px;color:#fbbf24">${total.totalPending > 0 ? fmtBaht(total.totalPending) : '—'}</td>
+          <td class="num" style="padding:12px">${totalPct}%</td>
+          <td class="num" style="padding:12px">${
+            total.carryOut > 0.01
+              ? `<span style="color:#fbbf24">ค้าง ${fmtLiter(total.carryOut)} ล.</span>`
+              : total.carryOut < -0.01
+                ? `<span style="color:#a7f3d0">เกิน ${fmtLiter(Math.abs(total.carryOut))} ล.</span>`
+                : '— ตรง —'
+          }</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras) {
+  const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
+  billStatusByCnt = billStatusByCnt || {};
+  extras = extras || [];
+  const extraLiters = extras.reduce((s, e) => s + Number(e.liters || 0), 0);
+
+  // Trip rows + billing
+  let tripTarget = 0, tripFee = 0;
+  let bill1Total = 0, bill2Total = 0, bill1Paid = 0, bill2Paid = 0;
+  const bill1Trips = [], bill2Trips = [];
+  const tripRows = trips.map(t => {
+    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no);
+    const target = price ? Number(price[fuelCol] || 0) : 0;
+    const fee = price ? Number(price.fee_driver || 0) : 0;
+    tripTarget += target;
+    tripFee += fee;
+    const billInfo = billPriceForTrip(t, cache.factoryMap, cache.priceSets);
+    const antsBill = billStatusByCnt[t.container_no] || null;
+    // ในระบบ ANTS: มี bill_no = วางบิลแล้ว → ตีความว่าจ่ายแล้ว
+    const isPaid = !!(antsBill && antsBill.bill_no);
+    // ถ้ามี price จาก ANTS transport_bills ใช้แทน (สูงสุดแม่นยำกว่าราคา freight_price_sets)
+    const billAmount = antsBill && antsBill.price ? Number(antsBill.price) : billInfo.amount;
+    const inBill1 = isBill1(t);
+    const tripData = {...t, billAmt: billAmount, factoryName: billInfo.factoryName, antsBill, isPaid};
+    if (inBill1) { bill1Total += billAmount; if (isPaid) bill1Paid += billAmount; bill1Trips.push(tripData); }
+    else         { bill2Total += billAmount; if (isPaid) bill2Paid += billAmount; bill2Trips.push(tripData); }
+    const label = t.factory || `[${key}] ${t.invoice_no || ''}`;
+    const warn = price ? '' : ' ⚠️';
+    return `<tr class="row-trip">
+      <td class="cat">ค่าพิเศษ</td>
+      <td>${fmtThaiDate(t.date_in)}</td>
+      <td>${esc(label.slice(0,30))}${warn}<br><small class="muted">${esc(t.invoice_no || '')} • ${esc(t.container_no || '')}</small></td>
+      <td class="num">${fmtLiter(target)}</td>
+      <td class="num">—</td>
+      <td class="num">${fmtBaht(fee)}</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+    </tr>`;
+  });
+  if (trips.length === 0) tripRows.push('<tr class="row-trip"><td class="cat">ค่าพิเศษ</td><td colspan="8" class="empty">— ไม่มีเที่ยวรอบนี้ —</td></tr>');
+
+  // Extra trips rows (เที่ยวพิเศษ — งานนอก)
+  const extraRows = extras.map(e => `<tr class="row-extra">
+    <td class="cat">เที่ยวพิเศษ</td>
+    <td>${fmtThaiDate(e.date)}</td>
+    <td>🟡 <strong>${esc(e.description)}</strong> <button class="del-btn" onclick="deleteExtraTrip(${e.id})" title="ลบ">×</button>${e.note ? '<br><small class="muted">' + esc(e.note) + '</small>' : ''}</td>
+    <td class="num">${fmtLiter(e.liters)}</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+  </tr>`);
+
+  // Outcomes split
+  const refills = outs.filter(o => o.category === 'ค่าน้ำมัน');
+  const paidDriver = outs.filter(o => ['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
+  const otherCosts = outs.filter(o => o.category !== 'ค่าน้ำมัน' && !['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
+
+  let refillL = 0, refillB = 0;
+  const refillRows = refills.map(r => {
+    refillL += Number(r.liters || 0);
+    refillB += Number(r.amount);
+    return `<tr class="row-fuel">
+      <td class="cat">ค่าน้ำมัน</td>
+      <td>${fmtThaiDate(r.date)}</td>
+      <td>${esc(r.note || 'เติมน้ำมัน')} <button class="del-btn" onclick="deleteOutcome(${r.id})" title="ลบ">×</button></td>
+      <td class="num">${fmtLiter(r.liters)}</td>
+      <td class="num">${fmtBaht(r.amount)}</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+    </tr>`;
+  });
+  if (refills.length === 0) refillRows.push('<tr class="row-fuel"><td class="cat">ค่าน้ำมัน</td><td colspan="8" class="empty">— ไม่มีการเติมน้ำมันรอบนี้ —</td></tr>');
+
+  let otherTotal = 0;
+  const otherRows = otherCosts.map(o => {
+    otherTotal += Number(o.amount);
+    const note = o.note || o.category;
+    return `<tr class="row-other">
+      <td class="cat">ค่าใช้จ่ายอื่นๆ</td>
+      <td>${fmtThaiDate(o.date)}</td>
+      <td><strong>${esc(o.category)}</strong>${note !== o.category ? ' — ' + esc(note) : ''} <button class="del-btn" onclick="deleteOutcome(${o.id})" title="ลบ">×</button></td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">${fmtBaht(o.amount)}</td>
+    </tr>`;
+  });
+  if (otherCosts.length === 0) otherRows.push('<tr class="row-other"><td class="cat">ค่าใช้จ่ายอื่นๆ</td><td colspan="8" class="empty">— ไม่มีค่าใช้จ่ายอื่นรอบนี้ —</td></tr>');
+
+  let driverFeePaid = 0, driverOT = 0, driverSalLogged = 0;
+  const paidRows = paidDriver.map(d => {
+    const amt = Number(d.amount);
+    if (d.category === 'ค่าเที่ยวคนขับ') driverFeePaid += amt;
+    if (d.category === 'ค่าล่วง') driverOT += amt;
+    if (d.category === 'เงินเดือน') driverSalLogged += amt;
+    return `<tr class="row-paid">
+      <td class="cat">จ่ายคนขับ</td>
+      <td>${fmtThaiDate(d.date)}</td>
+      <td>${esc(d.category)} — ${esc(d.note || 'บันทึกการจ่าย')} <button class="del-btn" onclick="deleteOutcome(${d.id})" title="ลบ">×</button></td>
+      <td class="num">—</td><td class="num">—</td>
+      <td class="num">${d.category === 'ค่าเที่ยวคนขับ' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">${d.category === 'ค่าล่วง' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">${d.category === 'เงินเดือน' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">—</td>
+    </tr>`;
+  });
+
+  const incomeNet = incs.reduce((s,i) => s + Number(i.amount_net), 0);
+
+  // Base salary
+  const baseSal = Number(truck.monthly_salary || 0);
+  const salaryDue = p.half === 2 ? baseSal : 0;
+  const driverSalary = driverSalLogged > 0 ? driverSalLogged : salaryDue;
+
+  const totalCost = refillB + otherTotal + driverFeePaid + driverOT + driverSalLogged;
+  const profit = incomeNet - totalCost;
+  const fuelVar = refillL - tripTarget;
+  const payslipTotal = tripFee + driverOT + driverSalary;
+
+  let matchMsg = '';
+  if (driverFeePaid > 0) {
+    const diff = payslipTotal - driverFeePaid;
+    if (Math.abs(diff) < 0.01) matchMsg = `<div class="ok-msg">✅ ยอดคำนวณ (${fmtBaht(payslipTotal)}) = จ่ายจริงในบันทึก (${fmtBaht(driverFeePaid)})</div>`;
+    else matchMsg = `<div class="warn-msg">⚠️ ยอดคำนวณ (${fmtBaht(payslipTotal)}) ≠ จ่ายจริง (${fmtBaht(driverFeePaid)}) — ต่าง ${diff > 0 ? '+' : ''}${diff.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} บ.</div>`;
+  }
+
+  const profitClass = profit >= 0 ? 'profit-pos' : 'profit-neg';
+  const profitSign = profit >= 0 ? '+' : '';
+
+  return `
+    <div class="header">
+      <div>
+        <h1>🚛 ${esc(truck.plate)}</h1>
+        <div class="driver">${esc(truck.driver_name)} • ใช้ลิตรชุดที่ ${truck.fuel_route} • เงินเดือน ${fmtBaht(baseSal)}/เดือน</div>
+      </div>
+      <div class="header-r">
+        <div class="period">${THAI_MONTHS[p.month]} ${p.year + 543} รอบ ${p.month}.${p.half}</div>
+        <div class="period-sub">${p.halfLabel}</div>
+      </div>
+    </div>
+
+    <div class="report-actions">
+      <button class="btn-print" onclick="window.print()">🖨️ ออกรีพอร์ต / พิมพ์</button>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>⛽ ถังน้ำมัน  <small style="color:#888;font-weight:400">(ถังเต็ม 600 ล.)</small></h3>
+        ${(() => {
+          const TANK_CAP = 600;
+          const carryIn = fp ? Number(fp.opening_liters || 0) : null;    // หนี้รอบก่อน
+          const bonus = fp ? Number(fp.bonus_liters || 0) : 0;
+          // รวมใช้รอบนี้ = เที่ยวหลัก + เที่ยวพิเศษ
+          const usedThisPeriod = tripTarget + extraLiters;
+          const required = carryIn != null ? carryIn + usedThisPeriod : null;
+          const totalRefill = refillL + bonus;
+          // diff = (เติมจริง + พิเศษ) - ต้องเติม
+          //   ลบ = ค้าง (ยังเติมไม่ครบ)
+          //   บวก = เกิน (เติมเกิน — warning)
+          const diff = required != null ? totalRefill - required : null;
+          // ระดับน้ำมันในถัง (สมมุติเติมก่อนแล้ววิ่ง)
+          const startLevel = carryIn != null ? Math.max(0, TANK_CAP - carryIn) : null;
+          const tankLevel = startLevel != null ? Math.max(0, Math.min(TANK_CAP, startLevel + refillL + bonus - usedThisPeriod)) : null;
+          const reviewed = fp && fp.reviewed;
+          const fillPct = tankLevel != null ? Math.round(tankLevel / TANK_CAP * 100) : 0;
+          return `
+          <div class="fuel-panel">
+            <div class="tank-wrap">
+              <svg viewBox="0 0 100 160" class="tank-svg">
+                <defs>
+                  <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#fbbf24"/>
+                    <stop offset="100%" stop-color="#dc2626"/>
+                  </linearGradient>
+                </defs>
+                <!-- ฝา -->
+                <rect x="38" y="2" width="24" height="8" rx="2" fill="#666"/>
+                <!-- ขอบถัง -->
+                <rect x="10" y="10" width="80" height="140" rx="8" fill="#f3f4f6" stroke="#374151" stroke-width="2"/>
+                <!-- น้ำมัน -->
+                <rect x="12" y="${12 + (140 - 4) * (1 - fillPct/100)}" width="76" height="${(140 - 4) * fillPct/100}" rx="4" fill="url(#fuelGrad)"/>
+                <!-- เส้น baseline (600) -->
+                <line x1="10" y1="12" x2="90" y2="12" stroke="#10b981" stroke-width="1" stroke-dasharray="3"/>
+                <text x="93" y="14" font-size="6" fill="#10b981">600</text>
+                <!-- ขีดทุก 100 ล. -->
+                ${[100,200,300,400,500].map(l => {
+                  const y = 12 + (140 - 4) * (1 - l/TANK_CAP);
+                  return `<line x1="10" y1="${y}" x2="14" y2="${y}" stroke="#9ca3af" stroke-width="0.5"/><text x="2" y="${y+1.5}" font-size="5" fill="#9ca3af">${l}</text>`;
+                }).join('')}
+              </svg>
+              <div class="tank-label">
+                <div class="tank-num">${tankLevel != null ? fmtLiter(tankLevel) : '—'}<span class="tank-unit"> ล.</span></div>
+                <div class="tank-sub">คงเหลือในถัง</div>
+                <div class="tank-pct">${fillPct}%</div>
+              </div>
+            </div>
+
+            <div class="fuel-stats">
+              <div class="fuel-stat-row">
+                <span class="lbl">ใช้รอบก่อน (หนี้ค้างเติม)</span>
+                <span class="val">${carryIn != null ? fmtLiter(carryIn) + ' ล.' : '<span class="placeholder">—</span>'}</span>
+              </div>
+              <div class="fuel-stat-row">
+                <span class="lbl">ใช้รอบนี้ (${trips.length} เที่ยว)</span>
+                <span class="val">${fmtLiter(tripTarget)} ล.</span>
+              </div>
+              ${extras.length > 0 ? `
+                <div class="fuel-stat-row">
+                  <span class="lbl">+ เที่ยวพิเศษ (${extras.length} งาน)</span>
+                  <span class="val">${fmtLiter(extraLiters)} ล.</span>
+                </div>` : ''}
+              <div class="fuel-stat-row total">
+                <span class="lbl">🎯 ที่คนขับต้องเติม</span>
+                <span class="val">${required != null ? fmtLiter(required) + ' ล.' : '—'}</span>
+              </div>
+              <div class="fuel-stat-row" style="margin-top:8px">
+                <span class="lbl">− เติมจริง (${refills.length} ครั้ง)</span>
+                <span class="val">−${fmtLiter(refillL)} ล.<br><small style="color:#888">${fmtBaht(refillB)} บ.</small></span>
+              </div>
+              <div class="fuel-stat-row">
+                <span class="lbl">− พิเศษคนขับ</span>
+                <span class="val">${bonus > 0 ? '−' + fmtLiter(bonus) + ' ล.' : '<span class="placeholder">—</span>'}</span>
+              </div>
+              ${diff != null ? `
+                <div class="fuel-result ${diff < 0 ? 'pending' : (diff > 0 ? 'over' : 'ok')}">
+                  ${diff < 0
+                    ? `<div class="result-label">🟠 ค้างต้องเติมเพิ่ม</div><div class="result-num">−${fmtLiter(Math.abs(diff))} ล.</div>`
+                    : diff > 0
+                      ? `<div class="result-label">🚨 เติมเกินไป! ห้ามเติมเพิ่ม</div><div class="result-num">+${fmtLiter(diff)} ล.</div>`
+                      : `<div class="result-label">✅ เติมพอดี!</div><div class="result-num">0 ล.</div>`}
+                </div>` : ''}
+              ${diff != null && carryIn != null ? `
+                <div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border:1px solid #93c5fd;border-radius:6px;font-size:13px">
+                  ↪ ยกยอด <strong>${diff <= 0 ? fmtLiter(Math.abs(diff)) : '-' + fmtLiter(diff)} ล.</strong> ไปเป็น opening ของรอบหน้า (${nextPeriodLabel(p)})
+                  <button onclick="closePeriod('${truck.plate}', ${p.year}, ${p.month}, ${p.half}, ${-diff})"
+                    style="margin-left:8px;padding:4px 12px;background:#2563eb;color:white;border:0;border-radius:4px;cursor:pointer;font-size:12px">
+                    🔄 ปิดรอบ + ยกยอด
+                  </button>
+                </div>
+              ` : ''}
+              <div style="margin-top:8px;text-align:right">
+                ${reviewed
+                  ? `<span class="badge" style="background:#d1fae5;color:#065f46;">✓ ยินยันแล้ว ${fp.reviewed_by ? '('+esc(fp.reviewed_by)+')' : ''}</span>`
+                  : `<span class="badge badge-pending">⏳ ยังไม่ยินยัน</span>`}
+              </div>
+              ${fp && fp.bonus_note ? `<div style="margin-top:6px;font-size:12px;color:#666">📝 ${esc(fp.bonus_note)}</div>` : ''}
+            </div>
+          </div>
+          `;
+        })()}
+      </div>
+      <div class="panel">
+        <h3>📊 KPI รอบนี้</h3>
+        <div class="kpis">
+          <div class="kpi"><div class="label">เที่ยวที่วิ่ง</div><div class="value">${trips.length}</div></div>
+          <div class="kpi"><div class="label">รายรับ (net)</div><div class="value">${incomeNet > 0 ? fmtBaht(incomeNet) : '—'}</div></div>
+          <div class="kpi"><div class="label">รายจ่ายรวม</div><div class="value">${fmtBaht(totalCost)}</div></div>
+          <div class="kpi ${profitClass}"><div class="label">กำไรรอบนี้</div><div class="value">${profitSign}${fmtBaht(profit)}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel billing-panel" style="margin-bottom:12px">
+      <h3>📋 วางบิล ANTS รอบนี้  <small style="font-weight:400;color:#888;font-size:12px">(✓ = ANTS จ่ายแล้ว)</small></h3>
+      <div class="bills">
+        <div class="bill bill1">
+          <div class="bill-head"><strong>บิล 1: OGM + KNT</strong>  <span class="bill-count">${bill1Trips.length} เที่ยว • จ่ายแล้ว ${bill1Trips.filter(t=>t.isPaid).length}/${bill1Trips.length}</span></div>
+          ${bill1Trips.length === 0 ? '<div class="bill-empty">— ไม่มีเที่ยว OGM/KNT รอบนี้ —</div>' :
+            '<table class="bill-table"><tbody>' +
+            bill1Trips.map(t => `<tr class="${t.isPaid ? 'paid' : ''}">
+              <td>${t.isPaid ? '<span class="pay-mark paid">✓</span>' : '<span class="pay-mark">○</span>'}</td>
+              <td>${fmtThaiDate(t.date_in)}</td>
+              <td>${esc(t.factoryName || '?')}</td>
+              <td><small>${esc(t.invoice_no || '')}${t.antsBill && t.antsBill.bill_no ? ' • ' + esc(t.antsBill.bill_no) : ''}</small></td>
+              <td class="num">${fmtBaht(t.billAmt)}</td>
+            </tr>`).join('') +
+            '</tbody></table>'}
+          <div class="bill-total">
+            จ่ายแล้ว: ${fmtBaht(bill1Paid)} / ค้าง: <strong>${fmtBaht(bill1Total - bill1Paid)}</strong> / รวม ${fmtBaht(bill1Total)} บ.
+          </div>
+        </div>
+        <div class="bill bill2">
+          <div class="bill-head"><strong>บิล 2: โรงงานอื่นๆ</strong>  <span class="bill-count">${bill2Trips.length} เที่ยว • จ่ายแล้ว ${bill2Trips.filter(t=>t.isPaid).length}/${bill2Trips.length}</span></div>
+          ${bill2Trips.length === 0 ? '<div class="bill-empty">— ไม่มีเที่ยวอื่นรอบนี้ —</div>' :
+            '<table class="bill-table"><tbody>' +
+            bill2Trips.map(t => `<tr class="${t.isPaid ? 'paid' : ''}">
+              <td>${t.isPaid ? '<span class="pay-mark paid">✓</span>' : '<span class="pay-mark">○</span>'}</td>
+              <td>${fmtThaiDate(t.date_in)}</td>
+              <td>${esc(t.factoryName || '?')}</td>
+              <td><small>${esc(t.invoice_no || '')}${t.antsBill && t.antsBill.bill_no ? ' • ' + esc(t.antsBill.bill_no) : ''}</small></td>
+              <td class="num">${fmtBaht(t.billAmt)}</td>
+            </tr>`).join('') +
+            '</tbody></table>'}
+          <div class="bill-total">
+            จ่ายแล้ว: ${fmtBaht(bill2Paid)} / ค้าง: <strong>${fmtBaht(bill2Total - bill2Paid)}</strong> / รวม ${fmtBaht(bill2Total)} บ.
+          </div>
+        </div>
+      </div>
+      <div class="bill-grand">รวมวางบิล ANTS รอบนี้: <strong>${fmtBaht(bill1Total + bill2Total)} บ.</strong> • จ่ายแล้ว ${fmtBaht(bill1Paid + bill2Paid)} • <span style="color:#fbbf24">ค้าง ${fmtBaht(bill1Total + bill2Total - bill1Paid - bill2Paid)}</span></div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th></th><th>วันที่</th><th>รายการ</th>
+        <th class="num">ลิตร</th><th class="num">น้ำมัน(บ.)</th>
+        <th class="num">ค่าเที่ยว</th><th class="num">ค่าล่วง</th>
+        <th class="num">เงินเดือน</th><th class="num">อื่นๆ</th>
+      </tr></thead>
+      <tbody>
+        ${tripRows.join('')}
+        ${extraRows.join('')}
+        ${refillRows.join('')}
+        ${otherRows.join('')}
+        ${paidRows.join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#1e3a5f;color:white;font-weight:700;">
+          <td colspan="3" style="padding:10px;">รวม ${esc(truck.driver_name)}</td>
+          <td class="num" style="padding:10px;">${fmtLiter(tripTarget)} / ${fmtLiter(refillL)}</td>
+          <td class="num" style="padding:10px;">${fmtBaht(refillB)}</td>
+          <td class="num" style="padding:10px;">${fmtBaht(tripFee)}</td>
+          <td class="num" style="padding:10px;">${driverOT > 0 ? fmtBaht(driverOT) : '—'}</td>
+          <td class="num" style="padding:10px;">${driverSalLogged > 0 ? fmtBaht(driverSalLogged) : '—'}</td>
+          <td class="num" style="padding:10px;">${otherTotal > 0 ? fmtBaht(otherTotal) : '—'}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+<div class="goto-input-hint" style="margin-top:12px;padding:10px 16px;background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;font-size:14px;color:#1e40af;">
+      💡 ต้องการกรอกข้อมูล? ไปที่แท็บ <strong>✏️ บันทึกข้อมูล</strong> ด้านบน — กรอกค่าน้ำมัน / รายจ่าย / รายรับ / เที่ยวพิเศษ ที่นั่น
+    </div>
+
+    <div class="payslip">
+      <h2>💰 รวมต้องจ่ายให้ ${esc(truck.driver_name)} รอบนี้</h2>
+      <div class="payslip-grid">
+        <div class="lbl">ค่าเที่ยว (จาก ${trips.length} เที่ยว × PRICE)</div><div class="val">${fmtBaht(tripFee)}</div>
+        <div class="lbl">ค่าล่วง</div><div class="val">${driverOT > 0 ? fmtBaht(driverOT) : '—'}</div>
+        <div class="lbl">เงินเดือน ${p.half === 2 ? `base (${fmtBaht(baseSal)} ต่อเดือน — จ่ายครึ่งหลัง)` : '(ครึ่งแรก — รอจ่ายครึ่งหลัง)'}</div><div class="val">${driverSalary > 0 ? fmtBaht(driverSalary) : '—'}</div>
+        <div class="lbl">อื่นๆ ที่จ่ายคนขับ</div><div class="val">—</div>
+        <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(payslipTotal)} บ.</div>
+      </div>
+      ${matchMsg}
+    </div>
+  `;
+}
+
+// ─── Controllers ──────────────────────────────────────────
+function setStatus(msg) {
+  const s = document.getElementById('status');
+  if (msg) { s.textContent = msg; s.style.display = ''; } else { s.style.display = 'none'; }
+}
+function setError(msg) {
+  const e = document.getElementById('error');
+  if (msg) { e.textContent = '❌ ' + msg; e.style.display = ''; } else { e.style.display = 'none'; }
+}
+
+async function reload() {
+  try {
+    setError(null);
+    await loadCache();
+    renderTabs();
+    const periodStr = document.getElementById('period-input').value.trim();
+    const p = parsePeriod(periodStr);
+    currentYear = p.year;  // remember for shortcuts
+    currentPeriod = formatPeriod(p.year, p.month, p.half);
+    document.getElementById('period-input').value = currentPeriod;
+
+    if (currentView === 'overview') {
+      setStatus(`โหลดภาพรวม 6 คัน รอบ ${currentPeriod}...`);
+      const allData = await fetchAllTrucksPeriod(p);
+      document.getElementById('report').innerHTML = renderOverview(p, allData);
+    } else if (currentView === 'input') {
+      setStatus(`โหลดหน้า INPUT รอบ ${currentPeriod}...`);
+      const data = await fetchInputPage(currentPlate, p);
+      document.getElementById('report').innerHTML = renderInput(p, currentPlate, data);
+      // seed 1 row in each batch form (expense forms only)
+      ['fuel', 'other', 'extra'].forEach(k => addBatchRow(k));
+    } else if (currentView === 'income') {
+      setStatus(`โหลดหน้า INPUT รายรับ รอบ ${currentPeriod}...`);
+      // fetch all incomes for the period (across all trucks — not filtered by plate)
+      const allIncRes = await ths.from('incomes').select('*').gte('date', p.start).lte('date', p.end).order('date', {ascending:false});
+      if (allIncRes.error) throw allIncRes.error;
+      document.getElementById('report').innerHTML = renderIncomeInput(p, currentPlate, {incs: allIncRes.data});
+      ['income1', 'income2', 'income3', 'income4'].forEach(k => addBatchRow(k));
+    } else if (currentView === 'monthly') {
+      setStatus(`โหลดรายงานกำไรรายเดือน ปี ${p.year}...`);
+      const monthData = await fetchMonthlyData(p.year);
+      document.getElementById('report').innerHTML = renderMonthly(p.year, monthData);
+    } else {
+      const truck = cache.trucks.find(t => t.plate === currentPlate);
+      if (!truck) throw new Error(`ไม่พบรถ ${currentPlate}`);
+      setStatus(`โหลดข้อมูล ${currentPlate} รอบ ${currentPeriod}...`);
+      const data = await fetchTruckPeriod(currentPlate, p.start, p.end, p.year, p.month, p.half);
+      document.getElementById('report').innerHTML = renderReport(truck, p, data.trips, data.outs, data.incs, data.fp, data.billStatusByCnt, data.extras);
+    }
+    setStatus(null);
+  } catch (e) {
+    setStatus(null);
+    setError(e.message || String(e));
+    console.error(e);
+  }
+}
+
+async function fetchAllTrucksPeriod(p) {
+  const trucks = cache.trucks.filter(t => t.plate !== 'XX-XXXX');
+  return Promise.all(trucks.map(async truck => {
+    const d = await fetchTruckPeriod(truck.plate, p.start, p.end, p.year, p.month, p.half);
+    return { truck, ...d };
+  }));
+}
+
+function selectOverview() {
+  currentView = 'overview';
+  reload();
+}
+
+function selectInput() {
+  currentView = 'input';
+  reload();
+}
+
+function selectIncomeInput() {
+  currentView = 'income';
+  reload();
+}
+
+function selectMonthly() {
+  currentView = 'monthly';
+  reload();
+}
+
+async function fetchMonthlyData(year) {
+  const start = `${year}-01-01`;
+  const end = `${year}-12-31`;
+  const [outs, incs] = await Promise.all([
+    ths.from('outcomes').select('truck_plate,date,amount').gte('date', start).lte('date', end),
+    ths.from('incomes').select('truck_plate,date,amount_net').gte('date', start).lte('date', end)
+  ]);
+  if (outs.error) throw outs.error;
+  if (incs.error) throw incs.error;
+  return { outs: outs.data, incs: incs.data };
+}
+
+function renderMonthly(year, data) {
+  const trucks = cache.trucks.filter(t => t.plate !== 'XX-XXXX');
+  const monthKeys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  // Aggregate: plate → month → {income, outcome}
+  const agg = {};
+  const ensureCell = (plate, m) => {
+    if (!agg[plate]) agg[plate] = {};
+    if (!agg[plate][m]) agg[plate][m] = { income: 0, outcome: 0 };
+    return agg[plate][m];
+  };
+  for (const o of data.outs) {
+    const m = parseInt(o.date.split('-')[1]);
+    ensureCell(o.truck_plate, m).outcome += Number(o.amount);
+  }
+  for (const i of data.incs) {
+    const m = parseInt(i.date.split('-')[1]);
+    ensureCell(i.truck_plate, m).income += Number(i.amount_net);
+  }
+
+  // Build rows: truck rows + XX-XXXX + totals
+  const fmtCell = (income, outcome) => {
+    const p = income - outcome;
+    if (income === 0 && outcome === 0) return '<span class="muted">—</span>';
+    const cls = p > 0 ? 'profit-pos' : (p < 0 ? 'profit-neg' : 'muted');
+    return `<span class="${cls}" title="รายรับ ${fmtBaht(income)} − รายจ่าย ${fmtBaht(outcome)}">${p >= 0 ? '+' : ''}${fmtBaht(p)}</span>`;
+  };
+
+  const truckRows = trucks.map(t => {
+    let yearIncome = 0, yearOutcome = 0;
+    const cells = monthKeys.map(m => {
+      const cell = agg[t.plate]?.[m] || { income: 0, outcome: 0 };
+      yearIncome += cell.income;
+      yearOutcome += cell.outcome;
+      return `<td class="num">${fmtCell(cell.income, cell.outcome)}</td>`;
+    }).join('');
+    const yearProfit = yearIncome - yearOutcome;
+    const yearCls = yearProfit > 0 ? 'profit-pos' : 'profit-neg';
+    return `<tr>
+      <td><strong>${esc(t.plate)}</strong><br><small class="muted">${esc(t.driver_name)}</small></td>
+      ${cells}
+      <td class="num year-total ${yearCls}"><strong>${yearProfit >= 0 ? '+' : ''}${fmtBaht(yearProfit)}</strong></td>
+    </tr>`;
+  }).join('');
+
+  // Fleet 6-truck totals
+  let fleet6Income = 0, fleet6Outcome = 0;
+  const fleet6Cells = monthKeys.map(m => {
+    let income = 0, outcome = 0;
+    for (const t of trucks) {
+      const cell = agg[t.plate]?.[m] || { income: 0, outcome: 0 };
+      income += cell.income;
+      outcome += cell.outcome;
+    }
+    fleet6Income += income;
+    fleet6Outcome += outcome;
+    return `<td class="num">${fmtCell(income, outcome)}</td>`;
+  }).join('');
+  const fleet6Year = fleet6Income - fleet6Outcome;
+
+  // XX-XXXX overhead row
+  let xxIncome = 0, xxOutcome = 0;
+  const xxCells = monthKeys.map(m => {
+    const cell = agg['XX-XXXX']?.[m] || { income: 0, outcome: 0 };
+    xxIncome += cell.income;
+    xxOutcome += cell.outcome;
+    return `<td class="num">${fmtCell(cell.income, cell.outcome)}</td>`;
+  }).join('');
+  const xxYear = xxIncome - xxOutcome;
+
+  // Net = fleet6 + XX-XXXX
+  const netIncome = fleet6Income + xxIncome;
+  const netOutcome = fleet6Outcome + xxOutcome;
+  const netYear = netIncome - netOutcome;
+  const netCells = monthKeys.map(m => {
+    let income = 0, outcome = 0;
+    for (const t of trucks) {
+      const cell = agg[t.plate]?.[m] || { income: 0, outcome: 0 };
+      income += cell.income; outcome += cell.outcome;
+    }
+    const xx = agg['XX-XXXX']?.[m] || { income: 0, outcome: 0 };
+    income += xx.income; outcome += xx.outcome;
+    return `<td class="num">${fmtCell(income, outcome)}</td>`;
+  }).join('');
+
+  return `
+    <div class="header">
+      <div>
+        <h1>📈 กำไรรายเดือน — ปี ${year}</h1>
+        <div class="driver">รายเดือน × 6 คัน + ค่าใช้จ่ายส่วนรวม (XX-XXXX) + กำไรสุทธิทั้งฝูง</div>
+      </div>
+      <div class="header-r">
+        <div class="period">${year}</div>
+        <div class="period-sub">ม.ค. - ธ.ค.</div>
+      </div>
+    </div>
+
+    <div class="monthly-summary" style="margin:14px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div class="kpi"><div class="label">รายรับรวมปี</div><div class="value">${fmtBaht(netIncome)}</div></div>
+      <div class="kpi"><div class="label">รายจ่ายรวมปี</div><div class="value">${fmtBaht(netOutcome)}</div></div>
+      <div class="kpi ${netYear>=0?'profit-pos':'profit-neg'}"><div class="label">กำไรสุทธิทั้งปี</div><div class="value">${netYear>=0?'+':''}${fmtBaht(netYear)}</div></div>
+      <div class="kpi"><div class="label">เดือนที่ผ่านมา</div><div class="value">${monthKeys.filter(m => trucks.some(t => agg[t.plate]?.[m])).length} / 12</div></div>
+    </div>
+
+    <div style="overflow-x:auto">
+    <table class="monthly-table">
+      <thead>
+        <tr>
+          <th style="position:sticky;left:0;background:#1e3a5f;z-index:2">รถ / คนขับ</th>
+          ${monthKeys.map(m => `<th class="num">${THAI_MONTHS[m]}</th>`).join('')}
+          <th class="num" style="background:#0369a1">รวมปี</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${truckRows}
+        <tr style="background:#dbeafe;font-weight:600">
+          <td style="position:sticky;left:0;background:#dbeafe">🚛 รวม 6 คัน</td>
+          ${fleet6Cells}
+          <td class="num year-total ${fleet6Year>=0?'profit-pos':'profit-neg'}"><strong>${fleet6Year>=0?'+':''}${fmtBaht(fleet6Year)}</strong></td>
+        </tr>
+        <tr style="background:#fef3c7">
+          <td style="position:sticky;left:0;background:#fef3c7"><span style="color:#92400e">🌐 XX-XXXX</span><br><small class="muted">ค่าใช้จ่ายส่วนรวม</small></td>
+          ${xxCells}
+          <td class="num year-total ${xxYear>=0?'profit-pos':'profit-neg'}"><strong>${xxYear>=0?'+':''}${fmtBaht(xxYear)}</strong></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="background:#1e3a5f;color:white;font-weight:700">
+          <td style="position:sticky;left:0;background:#1e3a5f">🟢 กำไรสุทธิทั้งฝูง</td>
+          ${netCells}
+          <td class="num year-total"><strong style="color:${netYear>=0?'#a7f3d0':'#fca5a5'}">${netYear>=0?'+':''}${fmtBaht(netYear)}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+
+    <div class="footer" style="margin-top:8px;font-size:12px;color:#888;text-align:left">
+      💡 hover แต่ละ cell เพื่อดู รายรับ/รายจ่าย แยก  •  ตัวเลข = รายรับ − รายจ่าย (กำไร)
+    </div>
+  `;
+}
+
+async function fetchInputPage(plate, p) {
+  // โหลด recent entries + trips + fuel_periods ของรถที่เลือกในรอบนี้
+  const [outs, incs, extras, trips, fp] = await Promise.all([
+    ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date', {ascending:false}).limit(50),
+    ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date', {ascending:false}).limit(50),
+    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date', {ascending:false}).limit(50),
+    sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', p.start).lte('date_in', p.end),
+    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', p.year).eq('month', p.month).eq('half', p.half).maybeSingle()
+  ]);
+  if (outs.error) throw outs.error;
+  if (incs.error) throw incs.error;
+  if (extras.error) throw extras.error;
+  if (trips.error) throw trips.error;
+  if (fp.error) throw fp.error;
+  return { outs: outs.data, incs: incs.data, extras: extras.data, trips: trips.data, fp: fp.data };
+}
+
+function renderInput(p, plate, data) {
+  const trucks = cache.trucks.filter(t => t.plate !== 'XX-XXXX');
+  const truck = trucks.find(t => t.plate === plate);
+  const truckOpts = trucks.map(t => `<option value="${t.plate}" ${t.plate === plate ? 'selected' : ''}>${esc(t.plate)} — ${esc(t.driver_name)}</option>`).join('');
+  const periodLabel = `${THAI_MONTHS[p.month]} ${p.year + 543} รอบ ${p.month}.${p.half}`;
+
+  // คำนวณ "น้ำมันที่ควรเติม" สำหรับรถ+รอบนี้
+  const fuelCol = truck && truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
+  let tripTarget = 0;
+  for (const t of (data.trips || [])) {
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no);
+    if (price) tripTarget += Number(price[fuelCol] || 0);
+  }
+  const extraL = (data.extras || []).reduce((s, e) => s + Number(e.liters || 0), 0);
+  const refillL = data.outs.filter(o => o.category === 'ค่าน้ำมัน').reduce((s, o) => s + Number(o.liters || 0), 0);
+  const carryIn = data.fp ? Number(data.fp.opening_liters || 0) : null;
+  const required = carryIn != null ? carryIn + tripTarget + extraL : tripTarget + extraL;
+  const recommendRefill = Math.max(0, required - refillL);  // ที่ยังควรเติม
+
+  const recentOuts = data.outs.map(o => `<tr>
+    <td>${fmtThaiDate(o.date)}</td>
+    <td>${esc(o.category)}</td>
+    <td class="num">${o.liters ? fmtLiter(o.liters) + ' ล.' : '—'}</td>
+    <td class="num">${fmtBaht(o.amount)}</td>
+    <td><small>${esc(o.note || '')}</small></td>
+    <td><button class="del-btn" onclick="deleteOutcome(${o.id})">×</button></td>
+  </tr>`).join('');
+
+  const recentIncs = data.incs.map(i => `<tr>
+    <td>${fmtThaiDate(i.date)}</td>
+    <td class="num">${fmtBaht(i.amount_gross)}</td>
+    <td class="num">${fmtBaht(i.amount_net)}</td>
+    <td><small>${esc(i.note || '')}</small></td>
+    <td><button class="del-btn" onclick="deleteIncome(${i.id})">×</button></td>
+  </tr>`).join('');
+
+  const recentExtras = data.extras.map(e => `<tr>
+    <td>${fmtThaiDate(e.date)}</td>
+    <td>${esc(e.description)}</td>
+    <td class="num">${fmtLiter(e.liters)} ล.</td>
+    <td><small>${esc(e.note || '')}</small></td>
+    <td><button class="del-btn" onclick="deleteExtraTrip(${e.id})">×</button></td>
+  </tr>`).join('');
+
+  return `
+    <div class="header">
+      <div>
+        <h1>✏️ บันทึกข้อมูล</h1>
+        <div class="driver">กรอกค่าน้ำมัน / รายจ่ายอื่น / รายรับ / เที่ยวพิเศษ</div>
+      </div>
+      <div class="header-r">
+        <div class="period">${periodLabel}</div>
+        <div class="period-sub">${p.halfLabel}</div>
+      </div>
+    </div>
+
+    <div class="input-truck-selector panel" style="margin:12px 0;display:flex;gap:12px;align-items:center;">
+      <label style="font-size:14px;font-weight:600;color:#555">🚛 เลือกรถที่จะบันทึก:</label>
+      <select id="input-truck-plate" onchange="onInputTruckChange()" style="font-family:inherit;font-size:14px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;">
+        ${truckOpts}
+      </select>
+      <span style="color:#888;font-size:12px">รอบ: ${p.month}.${p.half}/${p.year}  •  ${p.start} ถึง ${p.end}</span>
+    </div>
+
+    <div class="input-sections">
+      <div class="input-panel input-fuel">
+        <h3>⛽ INPUT ค่าใช้จ่ายน้ำมัน  <small style="color:#888;font-weight:400">— เพิ่มแถวได้หลายคัน</small></h3>
+        <div class="fuel-hint" style="margin-bottom:8px;padding:8px 12px;background:${recommendRefill > 0 ? '#fef3c7' : '#d1fae5'};border-left:4px solid ${recommendRefill > 0 ? '#f59e0b' : '#10b981'};border-radius:6px;font-size:14px;">
+          💡 <strong>${plate} น้ำมันที่ควรเติมรอบนี้ = ${fmtLiter(recommendRefill)} ล.</strong>
+          <small style="color:#666;margin-left:8px">
+            (ค้าง ${carryIn != null ? fmtLiter(carryIn) : '—'} + เป้า ${fmtLiter(tripTarget + extraL)} − เติมแล้ว ${fmtLiter(refillL)})
+          </small>
+        </div>
+        <table class="input-table">
+          <thead><tr>
+            <th style="width:155px">รถ</th><th style="width:130px">วันที่</th><th style="width:80px">ลิตร</th><th style="width:100px">ราคา/ลิตร</th><th style="width:115px">จำนวนเงิน</th><th>หมายเหตุ</th><th style="width:50px"></th>
+          </tr></thead>
+          <tbody id="fuel-rows"></tbody>
+        </table>
+        <div class="batch-sum">รวม: <span id="fuel-sum">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <button type="button" onclick="addBatchRow('fuel')" style="padding:5px 12px;background:#e5e7eb;border:0;border-radius:4px;cursor:pointer">+ เพิ่มแถว</button>
+          <button type="button" onclick="saveFuelBatch('${p.start}', '${p.end}')" style="padding:6px 18px;background:#f59e0b;color:white;border:0;border-radius:4px;cursor:pointer;font-weight:600">💾 บันทึกทั้งหมด</button>
+        </div>
+      </div>
+
+      <div class="input-panel input-other">
+        <h3>💸 INPUT ค่าใช้จ่ายอื่นๆ  <small style="color:#888;font-weight:400">— เพิ่มแถวได้หลายรายการ</small></h3>
+        <table class="input-table">
+          <thead><tr>
+            <th style="width:155px">รถ</th><th style="width:130px">วันที่</th><th style="width:160px">หมวดหมู่</th><th style="width:115px">จำนวนเงิน</th><th>หมายเหตุ</th><th style="width:50px"></th>
+          </tr></thead>
+          <tbody id="other-rows"></tbody>
+        </table>
+        <div class="batch-sum">รวม: <span id="other-sum">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <button type="button" onclick="addBatchRow('other')" style="padding:5px 12px;background:#e5e7eb;border:0;border-radius:4px;cursor:pointer">+ เพิ่มแถว</button>
+          <button type="button" onclick="saveOtherBatch('${p.start}', '${p.end}')" style="padding:6px 18px;background:#6b7280;color:white;border:0;border-radius:4px;cursor:pointer;font-weight:600">💾 บันทึกทั้งหมด</button>
+        </div>
+      </div>
+
+
+      <div class="input-panel input-extra" style="border-left-color:#fde047">
+        <h3>🟡 INPUT เที่ยวพิเศษ (งานนอก / น้ำมันพิเศษคนขับ)</h3>
+        <table class="input-table">
+          <thead><tr>
+            <th style="width:155px">รถ</th><th style="width:130px">วันที่</th><th>คำอธิบาย</th><th style="width:100px">ลิตร</th><th>หมายเหตุ</th><th style="width:50px"></th>
+          </tr></thead>
+          <tbody id="extra-rows"></tbody>
+        </table>
+        <div class="batch-sum">รวม: <span id="extra-sum">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <button type="button" onclick="addBatchRow('extra')" style="padding:5px 12px;background:#e5e7eb;border:0;border-radius:4px;cursor:pointer">+ เพิ่มแถว</button>
+          <button type="button" onclick="saveExtraBatch('${p.start}', '${p.end}')" style="padding:6px 18px;background:#eab308;color:white;border:0;border-radius:4px;cursor:pointer;font-weight:600">💾 บันทึกทั้งหมด</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-sections" style="margin-top:16px;display:grid;gap:12px;grid-template-columns:1fr 1fr">
+      <div class="panel">
+        <h3 style="font-size:14px;color:#555">📜 รายจ่ายล่าสุด (${data.outs.length})</h3>
+        ${data.outs.length === 0 ? '<div style="color:#888;font-style:italic">— ไม่มี —</div>' : `
+        <table style="width:100%;font-size:12px;background:transparent;box-shadow:none">
+          <thead><tr style="background:#f3f4f6;color:#555"><th style="padding:4px 6px;text-align:left">วันที่</th><th style="padding:4px 6px;text-align:left">หมวด</th><th class="num" style="padding:4px 6px">ลิตร</th><th class="num" style="padding:4px 6px">บาท</th><th style="padding:4px 6px">note</th><th></th></tr></thead>
+          <tbody>${recentOuts}</tbody>
+        </table>`}
+      </div>
+      <div class="panel">
+        <h3 style="font-size:14px;color:#555">💰 รายรับล่าสุด (${data.incs.length})</h3>
+        ${data.incs.length === 0 ? '<div style="color:#888;font-style:italic">— ไม่มี —</div>' : `
+        <table style="width:100%;font-size:12px;background:transparent;box-shadow:none">
+          <thead><tr style="background:#f3f4f6;color:#555"><th style="padding:4px 6px;text-align:left">วันที่</th><th class="num" style="padding:4px 6px">gross</th><th class="num" style="padding:4px 6px">net</th><th style="padding:4px 6px">note</th><th></th></tr></thead>
+          <tbody>${recentIncs}</tbody>
+        </table>`}
+      </div>
+      <div class="panel" style="grid-column:1 / -1">
+        <h3 style="font-size:14px;color:#555">🟡 เที่ยวพิเศษล่าสุด (${data.extras.length})</h3>
+        ${data.extras.length === 0 ? '<div style="color:#888;font-style:italic">— ไม่มี —</div>' : `
+        <table style="width:100%;font-size:12px;background:transparent;box-shadow:none">
+          <thead><tr style="background:#f3f4f6;color:#555"><th style="padding:4px 6px;text-align:left">วันที่</th><th style="padding:4px 6px;text-align:left">คำอธิบาย</th><th class="num" style="padding:4px 6px">ลิตร</th><th style="padding:4px 6px">note</th><th></th></tr></thead>
+          <tbody>${recentExtras}</tbody>
+        </table>`}
+      </div>
+    </div>
+  `;
+}
+
+function onInputTruckChange() {
+  currentPlate = document.getElementById('input-truck-plate').value;
+  reload();
+}
+
+function renderIncomeInput(p, plate, data) {
+  const periodLabel = `${THAI_MONTHS[p.month]} ${p.year + 543} รอบ ${p.month}.${p.half}`;
+  const incs = data.incs || [];
+  const byBill = {
+    THIRA_OGM: incs.filter(i => i.bill_type === 'THIRA_OGM' || i.bill_type === 'OGM_KNT' && i.truck_plate !== '72-2420'),
+    THIRA_ALL: incs.filter(i => i.bill_type === 'THIRA_ALL' || (i.bill_type === 'OTHER' || !i.bill_type) && i.truck_plate !== '72-2420'),
+    TJ_OGM:    incs.filter(i => i.bill_type === 'TJ_OGM'    || i.bill_type === 'OGM_KNT' && i.truck_plate === '72-2420'),
+    TJ_ALL:    incs.filter(i => i.bill_type === 'TJ_ALL'    || (i.bill_type === 'OTHER' || !i.bill_type) && i.truck_plate === '72-2420'),
+  };
+  const recentByBill = (list) => list.map(i => `<tr>
+    <td>${fmtThaiDate(i.date)}</td>
+    <td>${esc(i.truck_plate)}</td>
+    <td class="num">${fmtBaht(i.amount_gross)}</td>
+    <td class="num">${fmtBaht(i.amount_net)}</td>
+    <td><small>${esc(i.note || '')}</small></td>
+    <td><button class="del-btn" onclick="deleteIncome(${i.id})">×</button></td>
+  </tr>`).join('');
+
+  // Bill panel template
+  const billPanel = (kind, title, btType, color, bgColor, fillBtnLabel) => `
+    <div class="input-panel" style="border-left-color:${color}${bgColor?`;background:${bgColor}`:''}">
+      <h3>💰 ${title}  <small style="color:#888;font-weight:400">— เพิ่มแถวได้</small></h3>
+      <table class="input-table">
+        <thead><tr>
+          <th style="width:155px">รถ</th><th style="width:130px">วันที่</th><th style="width:115px">gross (บาท)</th><th style="width:115px">net (หัก 1%)</th><th>หมายเหตุ</th><th style="width:50px"></th>
+        </tr></thead>
+        <tbody id="${kind}-rows"></tbody>
+      </table>
+      <div class="batch-sum">รวม: <span id="${kind}-sum">—</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px">
+        <div>
+          <button type="button" onclick="addBatchRow('${kind}')" style="padding:5px 12px;background:#e5e7eb;border:0;border-radius:4px;cursor:pointer">+ เพิ่มแถว</button>
+          <button type="button" onclick="fillBillTrucks('${kind}', '${btType}')" style="padding:5px 12px;background:${color};color:white;border:0;border-radius:4px;cursor:pointer">${fillBtnLabel}</button>
+        </div>
+        <button type="button" onclick="saveIncomeBatch('${p.start}', '${p.end}', '${kind}', '${btType}')" style="padding:6px 18px;background:${color};color:white;border:0;border-radius:4px;cursor:pointer;font-weight:600">💾 บันทึก</button>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="header">
+      <div>
+        <h1>💰 บันทึกรายรับ</h1>
+        <div class="driver">กรอกรายรับแยกตามบิล (OGM+KNT vs โรงงานอื่นๆ)</div>
+      </div>
+      <div class="header-r">
+        <div class="period">${periodLabel}</div>
+        <div class="period-sub">${p.halfLabel}</div>
+      </div>
+    </div>
+
+    <div class="input-sections" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${billPanel('income1', 'THIRA OGM (5 คัน)',  'THIRA_OGM', '#f59e0b', '#fffbeb', '+ เพิ่ม 5 คันรวด')}
+      ${billPanel('income2', 'THIRA ALL (5 คัน)',  'THIRA_ALL', '#10b981', null,      '+ เพิ่ม 5 คันรวด')}
+      ${billPanel('income3', 'TJ OGM (72-2420)',  'TJ_OGM',    '#8b5cf6', '#f5f3ff', '+ ใส่ 72-2420')}
+      ${billPanel('income4', 'TJ ALL (72-2420)',  'TJ_ALL',    '#ec4899', null,      '+ ใส่ 72-2420')}
+    </div>
+
+    <div class="recent-sections" style="margin-top:16px;display:grid;gap:12px;grid-template-columns:1fr 1fr">
+      ${['THIRA_OGM','THIRA_ALL','TJ_OGM','TJ_ALL'].map(bt => {
+        const list = byBill[bt];
+        const titles = {THIRA_OGM:'THIRA OGM', THIRA_ALL:'THIRA ALL', TJ_OGM:'TJ OGM', TJ_ALL:'TJ ALL'};
+        const colors = {THIRA_OGM:'#fef3c7;color:#92400e', THIRA_ALL:'#d1fae5;color:#065f46', TJ_OGM:'#ede9fe;color:#5b21b6', TJ_ALL:'#fce7f3;color:#9d174d'};
+        return `
+        <div class="panel">
+          <h3 style="font-size:14px;color:#555">📜 ${titles[bt]} ที่บันทึกแล้ว: ${list.length} รายการ</h3>
+          ${list.length === 0 ? '<div style="color:#888;font-style:italic">— ไม่มี —</div>' : `
+          <table style="width:100%;font-size:12px;background:transparent;box-shadow:none">
+            <thead><tr style="background:${colors[bt]}"><th style="padding:4px 6px;text-align:left">วันที่</th><th style="padding:4px 6px;text-align:left">รถ</th><th class="num" style="padding:4px 6px">gross</th><th class="num" style="padding:4px 6px">net</th><th style="padding:4px 6px">note</th><th></th></tr></thead>
+            <tbody>${recentByBill(list)}</tbody>
+            <tfoot><tr style="background:#f3f4f6;font-weight:600"><td colspan="2" style="padding:4px 6px">รวม</td>
+              <td class="num" style="padding:4px 6px">${fmtBaht(list.reduce((s,i)=>s+Number(i.amount_gross),0))}</td>
+              <td class="num" style="padding:4px 6px">${fmtBaht(list.reduce((s,i)=>s+Number(i.amount_net),0))}</td>
+              <td colspan="2"></td></tr></tfoot>
+          </table>`}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+// เติม trucks ตาม bill type (THIRA = 5 คันยกเว้น 72-2420, TJ = แค่ 72-2420)
+function fillBillTrucks(kind, billType) {
+  const tbody = document.getElementById(`${kind}-rows`);
+  tbody.innerHTML = '';
+  let truckList;
+  if (billType.startsWith('THIRA')) {
+    truckList = cache.trucks.filter(t => t.plate !== 'XX-XXXX' && t.plate !== '72-2420');
+  } else {
+    truckList = cache.trucks.filter(t => t.plate === '72-2420');
+  }
+  for (const t of truckList) addBatchRow(kind, t.plate);
+}
+
+// ─── Batch row management ─────────────────────────────────
+let __rowCounter = 0;
+function _truckOpts(defaultPlate) {
+  return cache.trucks.filter(t => t.plate !== 'XX-XXXX')
+    .map(t => `<option value="${t.plate}" ${t.plate === defaultPlate ? 'selected' : ''}>${esc(t.plate)} — ${esc(t.driver_name)}</option>`).join('');
+}
+
+function addBatchRow(kind, presetPlate, presetDate, presetData) {
+  const rid = __rowCounter++;
+  const tbody = document.getElementById(`${kind}-rows`);
+  const plate = presetPlate || document.getElementById('input-truck-plate').value;
+  const p = parsePeriod(document.getElementById('period-input').value);
+  const date = presetDate || p.start;
+  const truckCell = `<td><select id="${kind}-plate-${rid}">${_truckOpts(plate)}</select></td>`;
+  const dateCell = `<td><input type="date" id="${kind}-date-${rid}" required min="${p.start}" max="${p.end}" value="${date}"></td>`;
+  const delBtn = `<td><button type="button" class="del-btn" onclick="removeBatchRow('${kind}', ${rid})">×</button></td>`;
+  let body = '';
+  if (kind === 'fuel') {
+    const liters = presetData?.liters || '';
+    const rate = (presetData?.rate || cache.fuelRate || 41.81).toFixed(2);
+    const amount = presetData?.amount || '';
+    body = `${truckCell}${dateCell}
+      <td><input type="number" id="fuel-liters-${rid}" step="0.1" min="0" placeholder="ลิตร" value="${liters}" oninput="updateFuelRowAmount(${rid})"></td>
+      <td><input type="number" id="fuel-rate-${rid}" step="0.01" min="0" placeholder="บาท/ล." value="${rate}" oninput="updateFuelRowAmount(${rid})"></td>
+      <td><input type="number" id="fuel-amount-${rid}" step="0.01" min="0" placeholder="auto" style="background:#fffbeb;font-weight:600" value="${amount}" oninput="updateBatchSum('fuel')"></td>
+      <td><input type="text" id="fuel-note-${rid}" placeholder="หมายเหตุ"></td>
+      ${delBtn}`;
+  } else if (kind === 'other') {
+    body = `${truckCell}${dateCell}
+      <td><select id="oth-cat-${rid}" required>
+        ${OUTCOME_CATEGORIES.filter(c => c !== 'ค่าน้ำมัน').map(c => `<option value="${c}">${c}</option>`).join('')}
+      </select></td>
+      <td><input type="number" id="oth-amount-${rid}" step="0.01" min="0" placeholder="บาท" oninput="updateBatchSum('other')"></td>
+      <td><input type="text" id="oth-note-${rid}" placeholder="หมายเหตุ"></td>
+      ${delBtn}`;
+  } else if (kind === 'income' || kind === 'income1' || kind === 'income2' || kind === 'income3' || kind === 'income4') {
+    const gross = presetData?.gross || '';
+    body = `${truckCell}${dateCell}
+      <td><input type="number" id="${kind}-amount-${rid}" step="0.01" min="0" placeholder="บาท" value="${gross}" oninput="updateIncomeRowNet('${kind}', ${rid})"></td>
+      <td><input type="text" id="${kind}-net-${rid}" disabled placeholder="auto"></td>
+      <td><input type="text" id="${kind}-note-${rid}" placeholder="หมายเหตุ"></td>
+      ${delBtn}`;
+  } else if (kind === 'extra') {
+    body = `${truckCell}${dateCell}
+      <td><input type="text" id="extra-desc-${rid}" placeholder="เช่น วิ่งกระดาษทราย"></td>
+      <td><input type="number" id="extra-liters-${rid}" step="0.1" min="0" placeholder="ลิตร" oninput="updateBatchSum('extra')"></td>
+      <td><input type="text" id="extra-note-${rid}" placeholder="หมายเหตุ"></td>
+      ${delBtn}`;
+  }
+  const tr = document.createElement('tr');
+  tr.id = `${kind}-row-${rid}`;
+  tr.innerHTML = body;
+  tbody.appendChild(tr);
+  if (presetData?.gross) updateIncomeRowNet(kind, rid);
+  if (presetData?.liters && presetData?.rate) updateFuelRowAmount(rid);
+  updateBatchSum(kind);
+}
+
+function removeBatchRow(kind, rid) {
+  const row = document.getElementById(`${kind}-row-${rid}`);
+  if (row) row.remove();
+  updateBatchSum(kind);
+}
+
+function updateFuelRowAmount(rid) {
+  const l = parseFloat(document.getElementById(`fuel-liters-${rid}`).value) || 0;
+  const r = parseFloat(document.getElementById(`fuel-rate-${rid}`).value) || 0;
+  document.getElementById(`fuel-amount-${rid}`).value = l * r > 0 ? (l * r).toFixed(2) : '';
+  updateBatchSum('fuel');
+}
+
+function updateIncomeRowNet(kind, rid) {
+  // backward compat: if called with just rid (old single-form)
+  if (typeof kind === 'number' && rid === undefined) { rid = kind; kind = 'income'; }
+  const v = parseFloat(document.getElementById(`${kind}-amount-${rid}`).value) || 0;
+  document.getElementById(`${kind}-net-${rid}`).value = v > 0 ? (v * 0.99).toFixed(2) : '';
+  updateBatchSum(kind);
+}
+
+// Sum all rows of a batch form and update footer cells
+function updateBatchSum(kind) {
+  const rows = _getRows(kind);
+  if (kind === 'fuel') {
+    let l=0, b=0;
+    for (const tr of rows) {
+      const rid = tr.id.split('-')[2];
+      l += parseFloat(document.getElementById(`fuel-liters-${rid}`)?.value || 0) || 0;
+      b += parseFloat(document.getElementById(`fuel-amount-${rid}`)?.value || 0) || 0;
+    }
+    const el = document.getElementById('fuel-sum');
+    if (el) el.innerHTML = `<strong>${fmtLiter(l)} ล. / ${fmtBaht(b)} บ.</strong>`;
+  } else if (kind === 'other') {
+    let b=0;
+    for (const tr of rows) {
+      const rid = tr.id.split('-')[2];
+      b += parseFloat(document.getElementById(`oth-amount-${rid}`)?.value || 0) || 0;
+    }
+    const el = document.getElementById('other-sum');
+    if (el) el.innerHTML = `<strong>${fmtBaht(b)} บ.</strong>`;
+  } else if (kind === 'income' || kind === 'income1' || kind === 'income2' || kind === 'income3' || kind === 'income4') {
+    let g=0, n=0;
+    for (const tr of rows) {
+      const parts = tr.id.split('-');
+      const rid = parts[parts.length - 1];
+      const gv = parseFloat(document.getElementById(`${kind}-amount-${rid}`)?.value || 0) || 0;
+      g += gv;
+      n += gv * 0.99;
+    }
+    const el = document.getElementById(`${kind}-sum`);
+    if (el) el.innerHTML = `gross <strong>${fmtBaht(g)}</strong> &nbsp;•&nbsp; net <strong>${fmtBaht(n)}</strong>`;
+  } else if (kind === 'extra') {
+    let l=0;
+    for (const tr of rows) {
+      const rid = tr.id.split('-')[2];
+      l += parseFloat(document.getElementById(`extra-liters-${rid}`)?.value || 0) || 0;
+    }
+    const el = document.getElementById('extra-sum');
+    if (el) el.innerHTML = `<strong>${fmtLiter(l)} ล.</strong>`;
+  }
+}
+
+function fillAllTrucksIncome(kind) {
+  kind = kind || 'income';
+  const tbody = document.getElementById(`${kind}-rows`);
+  tbody.innerHTML = '';
+  for (const t of cache.trucks.filter(t => t.plate !== 'XX-XXXX')) {
+    addBatchRow(kind, t.plate);
+  }
+}
+
+function _getRows(kind) {
+  return Array.from(document.querySelectorAll(`#${kind}-rows tr`));
+}
+
+async function saveFuelBatch(start, end) {
+  const rows = _getRows('fuel');
+  const items = [];
+  for (const tr of rows) {
+    const rid = tr.id.split('-')[2];
+    const plate = document.getElementById(`fuel-plate-${rid}`).value;
+    const date = document.getElementById(`fuel-date-${rid}`).value;
+    const liters = parseFloat(document.getElementById(`fuel-liters-${rid}`).value);
+    const rate = parseFloat(document.getElementById(`fuel-rate-${rid}`).value);
+    const amountIn = parseFloat(document.getElementById(`fuel-amount-${rid}`).value);
+    const note = document.getElementById(`fuel-note-${rid}`).value.trim() || null;
+    if (!liters || liters <= 0) continue;  // skip empty
+    if (date < start || date > end) { setError(`${plate}: วันที่อยู่นอกรอบ`); return; }
+    const amount = amountIn > 0 ? amountIn : (liters * rate);
+    items.push({truck_plate: plate, date, category: 'ค่าน้ำมัน', liters, amount, note});
+  }
+  if (items.length === 0) { setError('ไม่มีแถวที่กรอกครบ'); return; }
+  try {
+    const r = await ths.from('outcomes').insert(items);
+    if (r.error) throw r.error;
+    alert(`✓ บันทึก ${items.length} รายการเรียบร้อย`);
+    reload();
+  } catch (e) { setError('บันทึกไม่สำเร็จ: ' + e.message); }
+}
+
+async function saveOtherBatch(start, end) {
+  const rows = _getRows('other');
+  const items = [];
+  for (const tr of rows) {
+    const rid = tr.id.split('-')[2];
+    const plate = document.getElementById(`other-plate-${rid}`).value;
+    const date = document.getElementById(`other-date-${rid}`).value;
+    const category = document.getElementById(`oth-cat-${rid}`).value;
+    const amount = parseFloat(document.getElementById(`oth-amount-${rid}`).value);
+    const note = document.getElementById(`oth-note-${rid}`).value.trim() || null;
+    if (!amount || amount <= 0) continue;
+    if (date < start || date > end) { setError(`${plate}: วันที่อยู่นอกรอบ`); return; }
+    items.push({truck_plate: plate, date, category, liters: null, amount, note});
+  }
+  if (items.length === 0) { setError('ไม่มีแถวที่กรอกครบ'); return; }
+  try {
+    const r = await ths.from('outcomes').insert(items);
+    if (r.error) throw r.error;
+    alert(`✓ บันทึก ${items.length} รายการเรียบร้อย`);
+    reload();
+  } catch (e) { setError('บันทึกไม่สำเร็จ: ' + e.message); }
+}
+
+async function saveIncomeBatch(start, end, kind, billType) {
+  kind = kind || 'income';
+  const rows = _getRows(kind);
+  const items = [];
+  for (const tr of rows) {
+    const parts = tr.id.split('-');
+    const rid = parts[parts.length - 1];
+    const plate = document.getElementById(`${kind}-plate-${rid}`).value;
+    const date = document.getElementById(`${kind}-date-${rid}`).value;
+    const amount_gross = parseFloat(document.getElementById(`${kind}-amount-${rid}`).value);
+    const note = document.getElementById(`${kind}-note-${rid}`).value.trim() || null;
+    if (!amount_gross || amount_gross <= 0) continue;
+    if (date < start || date > end) { setError(`${plate}: วันที่อยู่นอกรอบ`); return; }
+    const row = {truck_plate: plate, date, amount_gross, note};
+    if (billType) row.bill_type = billType;
+    items.push(row);
+  }
+  if (items.length === 0) { setError('ไม่มีแถวที่กรอกครบ'); return; }
+  try {
+    const r = await ths.from('incomes').insert(items);
+    if (r.error) throw r.error;
+    alert(`✓ บันทึก ${items.length} รายการเรียบร้อย`);
+    reload();
+  } catch (e) { setError('บันทึกไม่สำเร็จ: ' + e.message); }
+}
+
+async function saveExtraBatch(start, end) {
+  const rows = _getRows('extra');
+  const items = [];
+  for (const tr of rows) {
+    const rid = tr.id.split('-')[2];
+    const plate = document.getElementById(`extra-plate-${rid}`).value;
+    const date = document.getElementById(`extra-date-${rid}`).value;
+    const description = document.getElementById(`extra-desc-${rid}`).value.trim();
+    const liters = parseFloat(document.getElementById(`extra-liters-${rid}`).value);
+    const note = document.getElementById(`extra-note-${rid}`).value.trim() || null;
+    if (!description || !liters || liters <= 0) continue;
+    if (date < start || date > end) { setError(`${plate}: วันที่อยู่นอกรอบ`); return; }
+    items.push({truck_plate: plate, date, description, liters, note});
+  }
+  if (items.length === 0) { setError('ไม่มีแถวที่กรอกครบ'); return; }
+  try {
+    const r = await ths.from('extra_trips').insert(items);
+    if (r.error) throw r.error;
+    alert(`✓ บันทึก ${items.length} รายการเรียบร้อย`);
+    reload();
+  } catch (e) { setError('บันทึกไม่สำเร็จ: ' + e.message); }
+}
+
+// Wrapper functions for input page (read truck from dropdown)
+function _inputPlate() { return document.getElementById('input-truck-plate').value; }
+
+async function addFuelOutcome2(ev, start, end) { return addFuelOutcome(ev, _inputPlate(), start, end); }
+async function addOtherOutcome2(ev, start, end) { return addOtherOutcome(ev, _inputPlate(), start, end); }
+async function addIncome2(ev, start, end) { return addIncome(ev, _inputPlate(), start, end); }
+async function addExtraTrip2(ev, start, end) { return addExtraTrip(ev, _inputPlate(), start, end); }
+
+function nextPeriodLabel(p) {
+  let m = p.month, h = p.half, y = p.year;
+  if (h === 1) { h = 2; }
+  else { h = 1; m += 1; if (m > 12) { m = 1; y += 1; } }
+  return `${m}.${h}/${y}`;
+}
+
+async function closeFleetPeriod(year, month, half) {
+  let nm = month, nh, ny = year;
+  if (half === 1) nh = 2;
+  else { nh = 1; nm = month + 1; if (nm > 12) { nm = 1; ny = year + 1; } }
+  const nextLbl = `${nm}.${nh}/${ny}`;
+
+  // Re-fetch current data to compute carries
+  setStatus('คำนวณยอดยกไป...');
+  const p = parsePeriod(`${month}.${half}/${year}`);
+  const allData = await fetchAllTrucksPeriod(p);
+  const trucks = allData.map(d => {
+    const sum = computeTruckSummary(d.truck, d.trips, d.outs, d.incs, d.fp, d.billStatusByCnt || {}, d.extras || []);
+    return { plate: d.truck.plate, driver: d.truck.driver_name, carryOut: sum.carryOut, reviewed: sum.reviewed };
+  });
+  setStatus(null);
+
+  // build summary
+  const lines = trucks.map(t =>
+    `  ${t.plate} (${t.driver}): ${t.carryOut >= 0 ? '+' : ''}${t.carryOut.toFixed(0)} ล. → opening รอบหน้า${t.reviewed ? '  (ปิดรอบไปแล้ว — skip)' : ''}`
+  ).join('\n');
+  const toProcess = trucks.filter(t => !t.reviewed);
+  if (toProcess.length === 0) {
+    alert('ทุกคันปิดรอบไปแล้ว ไม่มีอะไรให้ทำ');
+    return;
+  }
+
+  if (!confirm(`ปิดรอบ ${month}.${half}/${year} ทั้งฝูง → ${nextLbl}\n\n${lines}\n\nยืนยันปิด ${toProcess.length} คัน?`)) return;
+
+  try {
+    setStatus(`กำลังปิดรอบ ${toProcess.length} คัน...`);
+    let ok = 0, fail = 0;
+    for (const t of toProcess) {
+      try {
+        const upRes = await ths.from('fuel_periods').upsert({
+          truck_plate: t.plate, year: ny, month: nm, half: nh,
+          opening_liters: t.carryOut
+        }, { onConflict: 'truck_plate,year,month,half' });
+        if (upRes.error) throw upRes.error;
+        const mkRes = await ths.from('fuel_periods').update({
+          reviewed: true, reviewed_at: new Date().toISOString(), reviewed_by: 'RCN'
+        }).eq('truck_plate', t.plate).eq('year', year).eq('month', month).eq('half', half);
+        if (mkRes.error) throw mkRes.error;
+        ok++;
+      } catch (e) {
+        console.error(`Close failed for ${t.plate}:`, e);
+        fail++;
+      }
+    }
+    setStatus(null);
+    alert(`✓ ปิดรอบสำเร็จ ${ok} คัน${fail > 0 ? ` / ล้มเหลว ${fail} คัน` : ''}\nรอบ ${nextLbl} เริ่มแล้ว`);
+    reload();
+  } catch (e) {
+    setStatus(null);
+    setError('ปิดรอบฝูงไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function closePeriod(plate, year, month, half, carryOut) {
+  // compute next period (M.H rollover)
+  let nm = month, nh, ny = year;
+  if (half === 1) nh = 2;
+  else { nh = 1; nm = month + 1; if (nm > 12) { nm = 1; ny = year + 1; } }
+  const carryStr = carryOut >= 0 ? `${carryOut.toFixed(0)} ล.` : `เครดิต ${Math.abs(carryOut).toFixed(0)} ล.`;
+  if (!confirm(`ปิดรอบ ${month}.${half}/${year} ของ ${plate}\n→ ยกยอด ${carryStr} ไปเป็น opening ของ ${nm}.${nh}/${ny}\n\nยืนยัน?`)) return;
+  try {
+    // upsert next period opening
+    const upRes = await ths.from('fuel_periods').upsert({
+      truck_plate: plate, year: ny, month: nm, half: nh,
+      opening_liters: carryOut
+    }, { onConflict: 'truck_plate,year,month,half' });
+    if (upRes.error) throw upRes.error;
+    // mark current period reviewed
+    const mkRes = await ths.from('fuel_periods').update({
+      reviewed: true,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: 'RCN'
+    }).eq('truck_plate', plate).eq('year', year).eq('month', month).eq('half', half);
+    if (mkRes.error) throw mkRes.error;
+    alert(`✓ ปิดรอบเรียบร้อย\n→ ${nm}.${nh}/${ny} opening = ${carryOut.toFixed(0)} ล.`);
+    reload();
+  } catch (e) {
+    setError('ปิดรอบไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function deleteIncome(id) {
+  if (!confirm('ลบรายรับนี้?')) return;
+  if (!(await requireDeleteCode())) return;
+  try {
+    const r = await ths.from('incomes').delete().eq('id', id);
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) {
+    setError('ลบไม่สำเร็จ: ' + e.message);
+  }
+}
+
+function selectTruck(plate) {
+  currentView = 'truck';
+  currentPlate = plate;
+  reload();
+}
+
+function changePeriod(delta) {
+  try {
+    const p = parsePeriod(document.getElementById('period-input').value);
+    let { year, month, half } = p;
+    if (delta > 0) {
+      if (half === 1) half = 2;
+      else { half = 1; month += 1; }
+      if (month > 12) { month = 1; year += 1; }
+    } else {
+      if (half === 2) half = 1;
+      else { half = 2; month -= 1; }
+      if (month < 1) { month = 12; year -= 1; }
+    }
+    document.getElementById('period-input').value = formatPeriod(year, month, half);
+    reload();
+  } catch (e) { setError(e.message); }
+}
+
+// On Enter in period input → reload
+document.getElementById('period-input').addEventListener('keydown', e => { if (e.key === 'Enter') reload(); });
+
+// ─── Mutations ─────────────────────────────────────────────
+async function addExtraTrip(ev, plate, start, end) {
+  ev.preventDefault();
+  const date = document.getElementById('extra-date').value;
+  const description = document.getElementById('extra-desc').value.trim();
+  const liters = parseFloat(document.getElementById('extra-liters').value);
+  const note = document.getElementById('extra-note').value.trim() || null;
+  if (!date || !description || !liters || liters <= 0) return;
+  if (date < start || date > end) { alert('วันที่ต้องอยู่ในช่วงรอบนี้ (' + start + ' ถึง ' + end + ')'); return; }
+  try {
+    const r = await ths.from('extra_trips').insert({truck_plate: plate, date, description, liters, note});
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) {
+    setError('บันทึกไม่สำเร็จ: ' + e.message);
+  }
+}
+
+function updateFuelAmount() {
+  const l = parseFloat(document.getElementById('fuel-liters').value) || 0;
+  const r = parseFloat(document.getElementById('fuel-rate').value) || 0;
+  const amt = l * r;
+  // อัพเดทเฉพาะถ้า user ไม่ได้แก้ amount เอง (เช็คจาก data-manual flag)
+  const amountField = document.getElementById('fuel-amount');
+  if (!amountField.dataset.manual) {
+    amountField.value = amt > 0 ? amt.toFixed(2) : '';
+  }
+}
+
+function fillRecommended(liters) {
+  document.getElementById('fuel-liters').value = liters;
+  updateFuelAmount();
+}
+
+async function addFuelOutcome(ev, plate, start, end) {
+  ev.preventDefault();
+  const date = document.getElementById('fuel-date').value;
+  const liters = parseFloat(document.getElementById('fuel-liters').value);
+  const rate = parseFloat(document.getElementById('fuel-rate').value);
+  const amountInput = parseFloat(document.getElementById('fuel-amount').value);
+  // ใช้ค่าที่ user กรอกใน amount field; ถ้าว่างใช้ liters × rate
+  const amount = amountInput > 0 ? amountInput : (liters * rate);
+  const note = document.getElementById('fuel-note').value.trim() || null;
+  if (!date || !liters || liters <= 0 || !rate || rate <= 0 || !amount || amount <= 0) return;
+  if (date < start || date > end) { alert('วันที่ต้องอยู่ในช่วงรอบนี้'); return; }
+  try {
+    const finalNote = note || (Math.abs(amount - liters * rate) > 0.01 ? `เติม ${liters} ล. × ${rate} = ${(liters*rate).toFixed(2)} (override: ${amount.toFixed(2)})` : null);
+    const r = await ths.from('outcomes').insert({truck_plate: plate, date, category: 'ค่าน้ำมัน', liters, amount, note: finalNote});
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) { setError('บันทึกค่าน้ำมันไม่สำเร็จ: ' + e.message); }
+}
+
+async function addOtherOutcome(ev, plate, start, end) {
+  ev.preventDefault();
+  const date = document.getElementById('oth-date').value;
+  const category = document.getElementById('oth-cat').value;
+  const amount = parseFloat(document.getElementById('oth-amount').value);
+  const note = document.getElementById('oth-note').value.trim() || null;
+  if (!date || !category || !amount) return;
+  if (date < start || date > end) { alert('วันที่ต้องอยู่ในช่วงรอบนี้'); return; }
+  try {
+    const r = await ths.from('outcomes').insert({truck_plate: plate, date, category, liters: null, amount, note});
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) { setError('บันทึกรายจ่ายไม่สำเร็จ: ' + e.message); }
+}
+
+async function addIncome(ev, plate, start, end) {
+  ev.preventDefault();
+  const date = document.getElementById('inc-date').value;
+  const amount_gross = parseFloat(document.getElementById('inc-amount').value);
+  const note = document.getElementById('inc-note').value.trim() || null;
+  if (!date || !amount_gross || amount_gross <= 0) return;
+  if (date < start || date > end) { alert('วันที่ต้องอยู่ในช่วงรอบนี้'); return; }
+  try {
+    const r = await ths.from('incomes').insert({truck_plate: plate, date, amount_gross, note});
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) { setError('บันทึกรายรับไม่สำเร็จ: ' + e.message); }
+}
+
+function updateIncomeNet() {
+  const v = parseFloat(document.getElementById('inc-amount').value) || 0;
+  document.getElementById('inc-net').value = v > 0 ? (v * 0.99).toFixed(2) : '';
+}
+
+const DELETE_CODE = '625465';
+let __deleteModalResolver = null;
+
+function requireDeleteCode() {
+  return new Promise(resolve => {
+    __deleteModalResolver = resolve;
+    document.getElementById('modal-pin').value = '';
+    document.getElementById('modal-error').style.display = 'none';
+    document.getElementById('delete-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('modal-pin').focus(), 60);
+  });
+}
+
+function closeDeleteModal(confirmed) {
+  const pin = document.getElementById('modal-pin').value;
+  if (confirmed) {
+    if (pin !== DELETE_CODE) {
+      document.getElementById('modal-error').style.display = 'block';
+      document.getElementById('modal-pin').value = '';
+      document.getElementById('modal-pin').focus();
+      return;  // อย่าปิด modal — ให้ลองใหม่
+    }
+  }
+  document.getElementById('delete-modal').style.display = 'none';
+  if (__deleteModalResolver) {
+    __deleteModalResolver(confirmed && pin === DELETE_CODE);
+    __deleteModalResolver = null;
+  }
+}
+
+// Enter = confirm, Esc = cancel
+document.addEventListener('keydown', e => {
+  const modal = document.getElementById('delete-modal');
+  if (!modal || modal.style.display === 'none') return;
+  if (e.key === 'Enter') { e.preventDefault(); closeDeleteModal(true); }
+  if (e.key === 'Escape') { e.preventDefault(); closeDeleteModal(false); }
+});
+
+async function deleteOutcome(id) {
+  if (!confirm('ลบรายการนี้?')) return;
+  if (!(await requireDeleteCode())) return;
+  try {
+    const r = await ths.from('outcomes').delete().eq('id', id);
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) {
+    setError('ลบไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function deleteExtraTrip(id) {
+  if (!confirm('ลบเที่ยวพิเศษนี้?')) return;
+  if (!(await requireDeleteCode())) return;
+  try {
+    const r = await ths.from('extra_trips').delete().eq('id', id);
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) {
+    setError('ลบไม่สำเร็จ: ' + e.message);
+  }
+}
+
+// คำนวณรอบปัจจุบันจากวันที่จริง (default ตอนเปิดหน้า)
+function getCurrentPeriodCode() {
+  const t = new Date();
+  return `${t.getMonth()+1}.${t.getDate() < 16 ? 1 : 2}/${t.getFullYear()}`;
+}
+
+// Boot
+document.getElementById('period-input').value = getCurrentPeriodCode();
+reload();
+</script>
+</body>
+</html>
