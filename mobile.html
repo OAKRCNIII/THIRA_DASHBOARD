@@ -313,6 +313,7 @@
   <div class="top-row">
     <h1>🚛 THIRA Dashboard</h1>
     <div class="actions">
+      <button class="icon-btn" onclick="setAntsKey()" title="ตั้ง ANTS key">🔑</button>
       <button class="icon-btn" onclick="reload()" title="โหลดใหม่">🔄</button>
     </div>
   </div>
@@ -352,6 +353,14 @@ const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
 const ANTS_URL = 'https://ywslgrusflfuxtrtvlfu.supabase.co';
 let ANTS_KEY = localStorage.getItem('ANTS_KEY') || '';
+window.setAntsKey = function() {
+  const k = prompt('🔑 ใส่ ANTS Supabase key (เก็บใน iPhone เท่านั้น):\n— กด Cancel เพื่อข้าม —', ANTS_KEY || '');
+  if (k === null) return;
+  ANTS_KEY = k.trim();
+  if (ANTS_KEY) localStorage.setItem('ANTS_KEY', ANTS_KEY);
+  else localStorage.removeItem('ANTS_KEY');
+  location.reload();
+};
 const THAI_MONTHS_FULL = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
 const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });

@@ -256,6 +256,7 @@
       <button onclick="changePeriod(-1)">◀ ก่อน</button>
       <button onclick="changePeriod(+1)">ถัดไป ▶</button>
       <button onclick="reload()" title="โหลดใหม่">🔄</button>
+      <button onclick="setAntsKey()" title="ตั้ง ANTS key">🔑</button>
     </div>
   </div>
 
@@ -290,14 +291,18 @@
 // ─── Config ────────────────────────────────────────────────
 const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
-// ANTS billing project (อีก project) — ใช้เช็คว่าวางบิลแล้ว ANTS จ่ายหรือยัง
-// ⚠️ ANTS_KEY เก็บใน localStorage (prompt ครั้งแรก) — ไม่ commit ลง repo
+// ANTS billing project (อีก project — optional) — ใช้เช็คว่า ANTS จ่ายบิลรึยัง
+// ⚠️ ไม่บังคับ — ถ้าไม่ใส่ key ก็ใช้งานได้ปกติ แค่ไม่เห็นสถานะ "ANTS จ่ายแล้ว"
 const ANTS_URL = 'https://ywslgrusflfuxtrtvlfu.supabase.co';
 let ANTS_KEY = localStorage.getItem('ANTS_KEY') || '';
-if (!ANTS_KEY) {
-  ANTS_KEY = prompt('🔑 ใส่ ANTS Supabase key (เก็บไว้ใน browser เครื่องนี้เท่านั้น):\n— ถามคุณ RCN/INK ถ้าไม่รู้ —') || '';
+window.setAntsKey = function() {
+  const k = prompt('🔑 ใส่ ANTS Supabase key (เก็บไว้ใน browser เครื่องนี้เท่านั้น):\n— ถามคุณ RCN ถ้าไม่รู้ — กด Cancel เพื่อข้าม', ANTS_KEY || '');
+  if (k === null) return;
+  ANTS_KEY = k.trim();
   if (ANTS_KEY) localStorage.setItem('ANTS_KEY', ANTS_KEY);
-}
+  else localStorage.removeItem('ANTS_KEY');
+  location.reload();
+};
 const TRUCK_PLATES = ['71-9538', '72-1620', '72-2237', '72-2420', '72-2953', '72-3148'];
 const THAI_MONTHS = ['', 'ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const THAI_MONTHS_FULL = ['', 'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -335,7 +340,7 @@ const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   db: { schema: 'ants' }
 });
 // ANTS billing project client
-const ants = supabase.createClient(ANTS_URL, ANTS_KEY);
+const ants = ANTS_KEY ? supabase.createClient(ANTS_URL, ANTS_KEY) : null;
 
 // ─── Utility ───────────────────────────────────────────────
 const fmtBaht = (n, dflt='—') => (n == null || n === 0) ? dflt : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -456,10 +461,10 @@ async function fetchTruckPeriod(plate, start, end, year, month, half) {
   if (fp.error)    throw fp.error;
   if (extras.error) throw extras.error;
 
-  // หา paid status จาก ANTS Supabase: lookup ตาม container_no list
+  // หา paid status จาก ANTS Supabase (optional — ถ้ามี key)
   const containerNos = trips.data.map(t => t.container_no).filter(Boolean);
   let billStatusByCnt = {};
-  if (containerNos.length > 0) {
+  if (ants && containerNos.length > 0) {
     try {
       const billsRes = await ants.from('transport_bills')
         .select('container_no,invoice_no,bill_no,price,source,is_paid,bill_date')
