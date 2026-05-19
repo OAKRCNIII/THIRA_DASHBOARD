@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="55%" stop-color="#2c5282"/>
+      <stop offset="100%" stop-color="#3b6ea5"/>
+    </linearGradient>
+    <linearGradient id="trailerBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="cabBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="window" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="0" dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+
+  <!-- Subtle highlight -->
+  <circle cx="120" cy="120" r="160" fill="white" opacity="0.06"/>
+
+  <!-- Road line -->
+  <line x1="40" y1="392" x2="472" y2="392" stroke="white" stroke-width="3" stroke-dasharray="16 12" opacity="0.4"/>
+
+  <!-- Truck assembly -->
+  <g transform="translate(46, 184)" filter="url(#shadow)">
+    <!-- Trailer (the BIG box with TR letters) -->
+    <rect x="180" y="10" width="240" height="170" rx="10" fill="url(#trailerBody)" stroke="#1e3a5f" stroke-width="4"/>
+    <!-- TR letters on trailer side -->
+    <text x="300" y="125" text-anchor="middle"
+          font-family="'Arial Black', 'Sarabun', sans-serif"
+          font-weight="900" font-size="120"
+          fill="#1e3a5f" letter-spacing="2">TR</text>
+    <!-- Trailer top edge highlight -->
+    <line x1="186" y1="22" x2="414" y2="22" stroke="white" stroke-width="2" opacity="0.6"/>
+    <!-- Trailer rivets -->
+    <circle cx="190" cy="18" r="3" fill="#1e3a5f" opacity="0.4"/>
+    <circle cx="410" cy="18" r="3" fill="#1e3a5f" opacity="0.4"/>
+    <circle cx="190" cy="172" r="3" fill="#1e3a5f" opacity="0.4"/>
+    <circle cx="410" cy="172" r="3" fill="#1e3a5f" opacity="0.4"/>
+
+    <!-- Cab body (ORANGE) -->
+    <path d="M 0 180
+             L 0 110
+             Q 0 95 16 95
+             L 60 95
+             L 90 28
+             Q 96 16 112 16
+             L 160 16
+             Q 178 16 178 36
+             L 178 180 Z"
+          fill="url(#cabBody)" stroke="#1e3a5f" stroke-width="4"/>
+    <!-- Windshield -->
+    <path d="M 80 92 L 100 40 Q 104 32 114 32 L 156 32 Q 166 32 166 42 L 166 92 Z"
+          fill="url(#window)" stroke="#1e3a5f" stroke-width="2.5"/>
+    <!-- Door line -->
+    <line x1="128" y1="92" x2="128" y2="180" stroke="#1e3a5f" stroke-width="2.5" opacity="0.5"/>
+    <!-- Door handle -->
+    <rect x="115" y="125" width="10" height="4" rx="2" fill="#1e3a5f" opacity="0.6"/>
+    <!-- Headlight -->
+    <ellipse cx="14" cy="130" rx="9" ry="6" fill="#fef3c7" stroke="#1e3a5f" stroke-width="2"/>
+    <!-- Grille -->
+    <rect x="2" y="148" width="28" height="6" rx="3" fill="#1e3a5f" opacity="0.6"/>
+    <rect x="2" y="158" width="28" height="3" rx="1.5" fill="#1e3a5f" opacity="0.4"/>
+
+    <!-- Wheels with rim detail -->
+    <circle cx="44" cy="190" r="30" fill="#1e293b"/>
+    <circle cx="44" cy="190" r="15" fill="#94a3b8"/>
+    <circle cx="44" cy="190" r="6" fill="#1e293b"/>
+
+    <circle cx="220" cy="190" r="30" fill="#1e293b"/>
+    <circle cx="220" cy="190" r="15" fill="#94a3b8"/>
+    <circle cx="220" cy="190" r="6" fill="#1e293b"/>
+
+    <circle cx="300" cy="190" r="30" fill="#1e293b"/>
+    <circle cx="300" cy="190" r="15" fill="#94a3b8"/>
+    <circle cx="300" cy="190" r="6" fill="#1e293b"/>
+
+    <circle cx="380" cy="190" r="30" fill="#1e293b"/>
+    <circle cx="380" cy="190" r="15" fill="#94a3b8"/>
+    <circle cx="380" cy="190" r="6" fill="#1e293b"/>
+  </g>
+
+  <!-- THIRA brand text -->
+  <text x="256" y="462" text-anchor="middle" fill="white"
+        font-family="'Sarabun', 'Segoe UI', sans-serif"
+        font-weight="900" font-size="44" letter-spacing="8">THIRA</text>
+</svg>
