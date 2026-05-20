@@ -2636,9 +2636,40 @@ function updateIncomeNet() {
 const DELETE_CODE = '625465';
 let __deleteModalResolver = null;
 
-function requireDeleteCode() {
+// Preset ข้อความตามบริบท — ส่ง 'delete' (default) หรือ 'edit'
+const MODAL_PRESETS = {
+  delete: {
+    icon: '🔒',
+    title: 'ยืนยันการลบ',
+    msg:   'กรุณาใส่รหัสยืนยันเพื่อลบข้อมูลนี้',
+    btn:   'ยืนยันการลบ',
+    btnBg: 'var(--danger)'
+  },
+  edit: {
+    icon: '✏️',
+    title: 'ยืนยันการเปลี่ยน',
+    msg:   'กรุณาใส่รหัสยืนยันเพื่อแก้ไขข้อมูลนี้',
+    btn:   'ยืนยันการเปลี่ยน',
+    btnBg: 'var(--accent)'
+  }
+};
+
+function requireDeleteCode(kind = 'delete') {
   return new Promise(resolve => {
     __deleteModalResolver = resolve;
+    const preset = MODAL_PRESETS[kind] || MODAL_PRESETS.delete;
+    // ปรับ icon / title / msg / button text
+    const iconEl = document.querySelector('#delete-modal .modal-icon');
+    const titleEl = document.querySelector('#delete-modal .modal-title');
+    const msgEl = document.querySelector('#delete-modal .modal-msg');
+    const btnEl = document.querySelector('#delete-modal .btn-confirm');
+    if (iconEl) iconEl.textContent = preset.icon;
+    if (titleEl) titleEl.textContent = preset.title;
+    if (msgEl) msgEl.textContent = preset.msg;
+    if (btnEl) {
+      btnEl.textContent = preset.btn;
+      btnEl.style.background = preset.btnBg;
+    }
     document.getElementById('modal-pin').value = '';
     document.getElementById('modal-error').style.display = 'none';
     document.getElementById('delete-modal').style.display = 'flex';
@@ -2692,8 +2723,8 @@ async function editOutcomeNote(id, currentNote) {
   const newNote = prompt('แก้หมายเหตุ:', currentNote || '');
   if (newNote === null) return;                    // user กด Cancel
   if (newNote.trim() === (currentNote || '').trim()) return;   // ไม่มีการเปลี่ยน
-  // ใส่ PIN ก่อนเขียน DB (ใช้ modal เดียวกับการลบ)
-  if (!(await requireDeleteCode())) return;
+  // ใส่ PIN ก่อนเขียน DB (modal จะขึ้นว่า "ยืนยันการเปลี่ยน")
+  if (!(await requireDeleteCode('edit'))) return;
   try {
     const r = await ths.from('outcomes').update({ note: newNote.trim() || null }).eq('id', id);
     if (r.error) throw r.error;
