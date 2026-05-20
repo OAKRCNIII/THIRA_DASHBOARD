@@ -127,23 +127,34 @@
   <label>รอบ:</label>
   <input id="period-input" type="text" placeholder="5.2/2026">
   <button class="btn-print" onclick="reload()">🔄 โหลดรอบนี้</button>
-  <button class="btn-print" onclick="window.print()">🖨️ พิมพ์</button>
+  <button class="btn-print" onclick="downloadPDF()" style="background:#dc2626">📄 ดาวน์โหลด PDF</button>
+  <button class="btn-print" onclick="window.print()" style="background:#6b7280">🖨️ พิมพ์ผ่านบราวเซอร์</button>
   <a class="btn-back" href="dashboard.html">← กลับ Dashboard</a>
 </div>
 
-<!-- iPad / iOS tip — แสดงเฉพาะบน iPad (JS detect ด้านล่าง) -->
-<div id="ipad-tip" class="ipad-tip" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 16px;margin:0 20px 12px;border-radius:8px;font-size:14px;line-height:1.6;max-width:1100px;margin-left:auto;margin-right:auto;">
-  📱 <strong>กำลังใช้ iPad?</strong> ตอนกดพิมพ์ ให้ทำตามนี้:
-  <ol style="margin:6px 0 0;padding-left:24px">
-    <li>กดปุ่ม <strong>🖨️ พิมพ์</strong> ด้านบน</li>
-    <li>เลือก <strong>ขนาด</strong> = <code>A4</code></li>
-    <li>เลือก <strong>การวางแนว</strong> = <code>แนวนอน</code> (Landscape) ⬅</li>
-    <li>ในส่วน <strong>ตัวเลือก</strong> ติ๊ก <code>กราฟิกพื้นหลัง</code> เพื่อให้สีติด</li>
-  </ol>
+<!-- Mobile / iPad guidance -->
+<div id="ipad-tip" class="ipad-tip" style="display:none;background:#dcfce7;border:1px solid #86efac;color:#14532d;padding:12px 16px;margin:0 20px 12px;border-radius:8px;font-size:14px;line-height:1.6;max-width:1100px;margin-left:auto;margin-right:auto;">
+  📱 <strong>iPad / iPhone</strong> — แนะนำกด <strong>"📄 ดาวน์โหลด PDF"</strong> (สีแดง) — จะได้ไฟล์ A4 แนวนอนพอดี 1 คัน/หน้า ครบทุกอย่างชัวร์<br>
+  <small>(ปุ่มพิมพ์บราวเซอร์ของ iPad Safari ไม่ค่อยทำงานตรง บางทีรูปขาดหรือไม่เป็นแนวนอน)</small>
+</div>
+
+<!-- PDF loading overlay -->
+<div id="pdf-loading" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;padding:24px 32px;border-radius:12px;text-align:center;min-width:280px">
+    <div style="font-size:32px;margin-bottom:8px">📄</div>
+    <div style="font-size:16px;font-weight:600;color:#1e3a5f">กำลังสร้าง PDF...</div>
+    <div id="pdf-progress" style="font-size:13px;color:#666;margin-top:6px">เตรียมหน้า...</div>
+    <div style="margin-top:14px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
+      <div id="pdf-progress-bar" style="height:100%;width:0%;background:#1e3a5f;transition:width 0.3s"></div>
+    </div>
+  </div>
 </div>
 
 <div class="container" id="report">กำลังโหลด...</div>
 
+<!-- Libraries for client-side PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
@@ -491,6 +502,85 @@ async function reload() {
 // re-fit ก่อนพิมพ์ (กัน font / image โหลดช้า)
 window.addEventListener('beforeprint', autoFitPages);
 window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(autoFitPages, 150); });
+
+/**
+ * Client-side PDF generator — ใช้ html2canvas + jsPDF
+ *
+ * ทำไมต้องใช้: iPad Safari มีปัญหาตอน window.print() —
+ *   - ไม่ honor @page size landscape
+ *   - คำนวณ mm-to-px ต่างจาก Chrome desktop
+ *   - render หน้าซ้อนทับหรือ crop content
+ *
+ * วิธีนี้: capture .page เป็น canvas ที่ scale x2 → encode เป็น JPEG →
+ *   ใส่ลง A4 landscape PDF → save/share — output คุณภาพเดียวกันทุกอุปกรณ์
+ */
+async function downloadPDF() {
+  if (!window.html2canvas || !window.jspdf) {
+    alert('Library ยังโหลดไม่เสร็จ ลองอีกครั้งใน 5 วินาที');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const pages = document.querySelectorAll('.page');
+  if (pages.length === 0) { alert('ไม่มีข้อมูลให้พิมพ์'); return; }
+
+  // Show loading overlay
+  const overlay = document.getElementById('pdf-loading');
+  const progressText = document.getElementById('pdf-progress');
+  const progressBar = document.getElementById('pdf-progress-bar');
+  overlay.style.display = 'flex';
+  await new Promise(r => setTimeout(r, 50));   // ให้ overlay render ก่อน
+
+  try {
+    // A4 landscape: 297 × 210 mm
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const A4W = 297, A4H = 210;
+
+    // ทำให้ .page-inner reset scale ตอน capture — ให้ html2canvas เห็น natural size
+    autoFitPages();   // ใช้ค่า scale ที่ JS คำนวณไว้แล้ว
+    await new Promise(r => setTimeout(r, 100));
+
+    for (let i = 0; i < pages.length; i++) {
+      progressText.textContent = `หน้า ${i + 1} / ${pages.length}`;
+      progressBar.style.width = `${((i + 1) / pages.length) * 100}%`;
+      await new Promise(r => requestAnimationFrame(r));
+
+      // Capture เป็น canvas ที่ scale 2x ให้ภาพคมชัด
+      const canvas = await html2canvas(pages[i], {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: pages[i].scrollWidth,
+        windowHeight: pages[i].scrollHeight,
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+      if (i > 0) pdf.addPage('a4', 'landscape');
+      // Fit ลงเต็ม A4 landscape — รักษา aspect ratio
+      const imgRatio = canvas.width / canvas.height;
+      const pageRatio = A4W / A4H;
+      let w, h, x, y;
+      if (imgRatio > pageRatio) {
+        // image กว้างกว่า page → fit width
+        w = A4W; h = A4W / imgRatio; x = 0; y = (A4H - h) / 2;
+      } else {
+        // image สูงกว่า page → fit height
+        h = A4H; w = A4H * imgRatio; x = (A4W - w) / 2; y = 0;
+      }
+      pdf.addImage(imgData, 'JPEG', x, y, w, h);
+    }
+
+    // ตั้งชื่อไฟล์ตามรอบ
+    const periodStr = (document.getElementById('period-input').value || 'report').replace('/', '-');
+    pdf.save(`THIRA-รีพอร์ต-${periodStr}.pdf`);
+  } catch (e) {
+    console.error('PDF generation failed:', e);
+    alert('สร้าง PDF ไม่สำเร็จ: ' + e.message);
+  } finally {
+    overlay.style.display = 'none';
+  }
+}
+window.downloadPDF = downloadPDF;
 
 // URL param support: print_all.html?period=5.2/2026
 const urlPeriod = new URLSearchParams(location.search).get('period');
