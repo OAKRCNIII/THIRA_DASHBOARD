@@ -226,13 +226,20 @@ function lookupPrice(factory, invoice) {
 }
 
 async function fetchTruckData(plate, p) {
-  const [trips, outs, incs, extras] = await Promise.all([
+  const [trips, outs, incs, extras, fp] = await Promise.all([
     sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', p.start).lte('date_in', p.end).order('date_in'),
     ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date'),
     ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end),
-    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date')
+    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date'),
+    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', p.year).eq('month', p.month).eq('half', p.half).maybeSingle()
   ]);
-  return { trips: trips.data || [], outs: outs.data || [], incs: incs.data || [], extras: extras.data || [] };
+  return {
+    trips: trips.data || [],
+    outs: outs.data || [],
+    incs: incs.data || [],
+    extras: extras.data || [],
+    fp: fp.data || null
+  };
 }
 
 function computePay(truck, p, data) {
@@ -252,7 +259,23 @@ function computePay(truck, p, data) {
   const salaryDue = p.half === 2 ? baseSal : 0;
   const driverSalary = driverSalLogged > 0 ? driverSalLogged : salaryDue;
   const payslipTotal = tripFee + driverOT + driverSalary;
-  return { tripFee, tripTarget, driverFeePaid, driverOT, driverSalary, baseSal, payslipTotal, tripCount: data.trips.length };
+
+  // ── Fuel summary ──
+  const refills = data.outs.filter(o => o.category === 'ค่าน้ำมัน');
+  const refillL = refills.reduce((s,o) => s + Number(o.liters || 0), 0);
+  const refillB = refills.reduce((s,o) => s + Number(o.amount), 0);
+  const extraL  = data.extras.reduce((s,e) => s + Number(e.liters || 0), 0);
+  const fuelOpen  = data.fp ? Number(data.fp.opening_liters || 0) : 0;   // น้ำมันเริ่มต้น
+  const fuelBonus = data.fp ? Number(data.fp.bonus_liters || 0) : 0;
+  const required = fuelOpen + tripTarget + extraL;
+  const totalRefill = refillL + fuelBonus;
+  const fuelCarry = required - totalRefill;   // น้ำมันยกไป (+=ค้าง, -=เกิน)
+
+  return {
+    tripFee, tripTarget, driverFeePaid, driverOT, driverSalary, baseSal,
+    payslipTotal, tripCount: data.trips.length,
+    fuelOpen, fuelCarry, refillL, refillB, extraL, fuelBonus
+  };
 }
 
 function renderSummaryPage(p, summaries) {
@@ -415,6 +438,24 @@ function renderTruckPage(truck, p, data, pay) {
             <div class="lbl">เงินเดือน ${p.half === 2 ? `(${fmtBaht(pay.baseSal)}/เดือน)` : '(ครึ่งแรก — รอ)'}</div><div class="val">${pay.driverSalary > 0 ? fmtBaht(pay.driverSalary) : '—'}</div>
             <div class="lbl">อื่นๆ</div><div class="val">—</div>
             <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(pay.payslipTotal)} บ.</div>
+          </div>
+        </div>
+
+        <!-- ⛽ Fuel summary — น้ำมันเริ่มต้น / ยกไป -->
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:11px;line-height:1.6">
+          <div style="font-weight:600;color:#c2410c;margin-bottom:6px">⛽ สรุปน้ำมัน</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-variant-numeric:tabular-nums">
+            <div>น้ำมันเริ่มต้น (ค้างจากรอบก่อน)</div><div style="text-align:right;font-weight:600">${fmtLiter(pay.fuelOpen)} ล.</div>
+            <div>ใช้รอบนี้ (${pay.tripCount} เที่ยว)</div><div style="text-align:right">${fmtLiter(pay.tripTarget)} ล.</div>
+            ${pay.extraL > 0 ? `<div>+ เที่ยวพิเศษ</div><div style="text-align:right">${fmtLiter(pay.extraL)} ล.</div>` : ''}
+            <div>− เติมจริง (${(((pay.refillL||0)>0)?Math.round(pay.refillB/(pay.refillL||1)):'0')} ฿/ล.)</div><div style="text-align:right">−${fmtLiter(pay.refillL)} ล.</div>
+            ${pay.fuelBonus > 0 ? `<div>− พิเศษคนขับ</div><div style="text-align:right">−${fmtLiter(pay.fuelBonus)} ล.</div>` : ''}
+            <div style="border-top:1px solid #fed7aa;padding-top:4px;margin-top:2px;font-weight:700;color:${pay.fuelCarry > 0 ? '#c2410c' : '#16a34a'}">
+              ${pay.fuelCarry > 0 ? '🟠 น้ำมันยกไปรอบหน้า (ค้าง)' : pay.fuelCarry < 0 ? '🟢 น้ำมันยกไป (เกิน)' : '✅ พอดี'}
+            </div>
+            <div style="border-top:1px solid #fed7aa;padding-top:4px;margin-top:2px;text-align:right;font-weight:700;font-size:13px;color:${pay.fuelCarry > 0 ? '#c2410c' : '#16a34a'}">
+              ${pay.fuelCarry > 0 ? '+' : ''}${fmtLiter(Math.abs(pay.fuelCarry))} ล.
+            </div>
           </div>
         </div>
       </div>
