@@ -992,9 +992,10 @@ function renderTabs() {
   tabs.innerHTML = sectionRow + truckRow;
 }
 
-function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extras) {
+function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extras, carryUnpaid) {
   const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   extras = extras || [];
+  carryUnpaid = carryUnpaid || [];
   let tripTarget = 0, tripFee = 0;
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0;
   let bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
@@ -1016,6 +1017,20 @@ function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extr
       if (isPaid) { bill2Paid += amt; bill2PaidCnt++; }
     }
   }
+
+  // ── Carryover bills จากรอบก่อน (ที่ยังไม่จ่าย) ──
+  let carryBill1Total = 0, carryBill2Total = 0;
+  let carryBill1Cnt = 0, carryBill2Cnt = 0;
+  for (const t of carryUnpaid) {
+    const antsBill = billStatusByCnt[t.container_no] || null;
+    const billInfo = billPriceForTrip(t, cache.factoryMap, cache.priceSets);
+    const amt = antsBill && antsBill.price ? Number(antsBill.price) : billInfo.amount;
+    if (isBill1(t)) { carryBill1Total += amt; carryBill1Cnt++; }
+    else            { carryBill2Total += amt; carryBill2Cnt++; }
+  }
+  const carryBillTotal = carryBill1Total + carryBill2Total;
+  const carryBillCnt = carryBill1Cnt + carryBill2Cnt;
+
   const refills = outs.filter(o => o.category === 'ค่าน้ำมัน');
   const refillL = refills.reduce((s, o) => s + Number(o.liters || 0), 0);
   const refillB = refills.reduce((s, o) => s + Number(o.amount), 0);
@@ -1035,6 +1050,12 @@ function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extr
     totalBill: bill1 + bill2,
     totalPaid: bill1Paid + bill2Paid,
     totalPending: (bill1 - bill1Paid) + (bill2 - bill2Paid),
+    // Carryover (จากรอบก่อน — ยังค้าง)
+    carryBill1Total, carryBill2Total, carryBillTotal,
+    carryBill1Cnt, carryBill2Cnt, carryBillCnt,
+    // Total (รวมรอบนี้ + carryover)
+    grandTotalBill: bill1 + bill2 + carryBillTotal,
+    grandTotalPending: (bill1 - bill1Paid) + (bill2 - bill2Paid) + carryBillTotal,
     tripFee, tripTarget, extraL, refillL, refillB, fuelVar,
     carryIn, carryOut,
     reviewed: fp ? !!fp.reviewed : false,
@@ -1045,7 +1066,7 @@ function renderOverview(p, allData) {
   // Compute summaries
   const rows = allData.map(d => ({
     truck: d.truck,
-    sum: computeTruckSummary(d.truck, d.trips, d.outs, d.incs, d.fp, d.billStatusByCnt || {}, d.extras || [])
+    sum: computeTruckSummary(d.truck, d.trips, d.outs, d.incs, d.fp, d.billStatusByCnt || {}, d.extras || [], d.carryUnpaid || [])
   }));
   // Totals
   const total = rows.reduce((acc, r) => {
@@ -1057,26 +1078,52 @@ function renderOverview(p, allData) {
     acc.totalBill += r.sum.totalBill; acc.totalPaid += r.sum.totalPaid; acc.totalPending += r.sum.totalPending;
     acc.refillL += r.sum.refillL; acc.refillB += r.sum.refillB; acc.tripTarget += r.sum.tripTarget;
     acc.carryOut += r.sum.carryOut;
+    // Carryover (รวมเก่า)
+    acc.carryBill1Total += r.sum.carryBill1Total; acc.carryBill2Total += r.sum.carryBill2Total;
+    acc.carryBillTotal += r.sum.carryBillTotal;
+    acc.carryBill1Cnt += r.sum.carryBill1Cnt;   acc.carryBill2Cnt += r.sum.carryBill2Cnt;
+    acc.carryBillCnt += r.sum.carryBillCnt;
+    acc.grandTotalBill += r.sum.grandTotalBill;
+    acc.grandTotalPending += r.sum.grandTotalPending;
     return acc;
-  }, {trips:0, bill1:0, bill2:0, bill1Paid:0, bill2Paid:0, bill1Cnt:0, bill2Cnt:0, bill1PaidCnt:0, bill2PaidCnt:0, totalBill:0, totalPaid:0, totalPending:0, refillL:0, refillB:0, tripTarget:0, carryOut:0});
+  }, {
+    trips:0, bill1:0, bill2:0, bill1Paid:0, bill2Paid:0, bill1Cnt:0, bill2Cnt:0,
+    bill1PaidCnt:0, bill2PaidCnt:0, totalBill:0, totalPaid:0, totalPending:0,
+    refillL:0, refillB:0, tripTarget:0, carryOut:0,
+    carryBill1Total:0, carryBill2Total:0, carryBillTotal:0,
+    carryBill1Cnt:0, carryBill2Cnt:0, carryBillCnt:0,
+    grandTotalBill:0, grandTotalPending:0
+  });
 
   const periodLabel = `${THAI_MONTHS[p.month]} ${p.year + 543}  รอบ ${p.month}.${p.half}`;
   const tableRows = rows.map(r => {
-    const pct = r.sum.totalBill > 0 ? Math.round(r.sum.totalPaid / r.sum.totalBill * 100) : 0;
+    // % จ่ายคำนวณจาก grandTotal (รวมเก่า) — เพราะถ้ามีค้างเก่ายังไม่จ่าย % ต้องลดลงด้วย
+    const pct = r.sum.grandTotalBill > 0 ? Math.round(r.sum.totalPaid / r.sum.grandTotalBill * 100) : 0;
+    const carryBadge = (cnt, amt) => cnt > 0
+      ? `<br><small style="color:#92400e;font-weight:600">⏳ +${cnt} เก่า ${fmtBaht(amt)}</small>`
+      : '';
     return `<tr onclick="selectTruck('${r.truck.plate}')" style="cursor:pointer">
       <td><strong>${esc(r.truck.plate)}</strong><br><small class="muted">${esc(r.truck.driver_name)}</small></td>
-      <td class="num">${r.sum.trips}</td>
+      <td class="num">${r.sum.trips}${r.sum.carryBillCnt > 0 ? `<br><small style="color:#92400e">+${r.sum.carryBillCnt} เก่า</small>` : ''}</td>
       <td class="num">
-        ${fmtBaht(r.sum.bill1)}<br>
-        <small class="muted">${r.sum.bill1PaidCnt}/${r.sum.bill1Cnt} เที่ยว</small>
+        ${fmtBaht(r.sum.bill1)}
+        <br><small class="muted">${r.sum.bill1PaidCnt}/${r.sum.bill1Cnt} เที่ยว</small>
+        ${carryBadge(r.sum.carryBill1Cnt, r.sum.carryBill1Total)}
       </td>
       <td class="num">
-        ${fmtBaht(r.sum.bill2)}<br>
-        <small class="muted">${r.sum.bill2PaidCnt}/${r.sum.bill2Cnt} เที่ยว</small>
+        ${fmtBaht(r.sum.bill2)}
+        <br><small class="muted">${r.sum.bill2PaidCnt}/${r.sum.bill2Cnt} เที่ยว</small>
+        ${carryBadge(r.sum.carryBill2Cnt, r.sum.carryBill2Total)}
       </td>
-      <td class="num"><strong>${fmtBaht(r.sum.totalBill)}</strong></td>
-      <td class="num" style="color:#2f855a">${fmtBaht(r.sum.totalPaid)}</td>
-      <td class="num" style="color:#c05621;font-weight:600">${r.sum.totalPending > 0 ? fmtBaht(r.sum.totalPending) : '—'}</td>
+      <td class="num">
+        <strong>${fmtBaht(r.sum.grandTotalBill)}</strong>
+        ${r.sum.carryBillTotal > 0 ? `<br><small style="color:#92400e">(รอบนี้ ${fmtBaht(r.sum.totalBill)})</small>` : ''}
+      </td>
+      <td class="num" style="color:#2f855a">${r.sum.totalPaid > 0 ? fmtBaht(r.sum.totalPaid) : '—'}</td>
+      <td class="num" style="color:#c05621;font-weight:600">
+        ${r.sum.grandTotalPending > 0 ? fmtBaht(r.sum.grandTotalPending) : '—'}
+        ${r.sum.carryBillTotal > 0 ? `<br><small style="color:#92400e">⏳ ${fmtBaht(r.sum.carryBillTotal)} เก่า</small>` : ''}
+      </td>
       <td class="num">
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <small>${pct}%</small>
@@ -1091,7 +1138,8 @@ function renderOverview(p, allData) {
     </tr>`;
   }).join('');
 
-  const totalPct = total.totalBill > 0 ? Math.round(total.totalPaid / total.totalBill * 100) : 0;
+  // % จ่ายคำนวณจาก grandTotal (รวมค้างเก่า)
+  const totalPct = total.grandTotalBill > 0 ? Math.round(total.totalPaid / total.grandTotalBill * 100) : 0;
 
   return `
     <div class="header">
@@ -1106,10 +1154,21 @@ function renderOverview(p, allData) {
     </div>
 
     <div class="overview-kpis">
-      <div class="kpi"><div class="label">เที่ยวรวม</div><div class="value">${total.trips}</div></div>
-      <div class="kpi"><div class="label">วางบิลรวม</div><div class="value">${fmtBaht(total.totalBill)}</div></div>
+      <div class="kpi">
+        <div class="label">เที่ยวรวม</div>
+        <div class="value">${total.trips}${total.carryBillCnt > 0 ? `<span class="unit">+${total.carryBillCnt} เก่า</span>` : ''}</div>
+      </div>
+      <div class="kpi">
+        <div class="label">วางบิลรวม</div>
+        <div class="value">${fmtBaht(total.grandTotalBill)}</div>
+        ${total.carryBillTotal > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:4px">⏳ ค้างเก่า ${fmtBaht(total.carryBillTotal)}</div>` : ''}
+      </div>
       <div class="kpi profit-pos"><div class="label">จ่ายแล้ว</div><div class="value">${fmtBaht(total.totalPaid)}</div></div>
-      <div class="kpi profit-neg"><div class="label">ค้างชำระ</div><div class="value">${fmtBaht(total.totalPending)}</div></div>
+      <div class="kpi profit-neg">
+        <div class="label">ค้างชำระ</div>
+        <div class="value">${fmtBaht(total.grandTotalPending)}</div>
+        ${total.carryBillTotal > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:4px">⏳ เก่า ${fmtBaht(total.carryBillTotal)} + รอบนี้ ${fmtBaht(total.totalPending)}</div>` : ''}
+      </div>
       <div class="kpi"><div class="label">% จ่ายแล้ว</div><div class="value">${totalPct}%</div></div>
     </div>
 
@@ -1155,12 +1214,21 @@ function renderOverview(p, allData) {
       <tfoot>
         <tr style="background:#1e3a5f;color:white;font-weight:700;">
           <td style="padding:12px">รวมทั้งฝูง</td>
-          <td class="num" style="padding:12px">${total.trips}</td>
-          <td class="num" style="padding:12px">${fmtBaht(total.bill1)}<br><small style="opacity:0.7;font-weight:400">${total.bill1PaidCnt}/${total.bill1Cnt}</small></td>
-          <td class="num" style="padding:12px">${fmtBaht(total.bill2)}<br><small style="opacity:0.7;font-weight:400">${total.bill2PaidCnt}/${total.bill2Cnt}</small></td>
-          <td class="num" style="padding:12px">${fmtBaht(total.totalBill)}</td>
-          <td class="num" style="padding:12px;color:#a7f3d0">${fmtBaht(total.totalPaid)}</td>
-          <td class="num" style="padding:12px;color:#fbbf24">${total.totalPending > 0 ? fmtBaht(total.totalPending) : '—'}</td>
+          <td class="num" style="padding:12px">${total.trips}${total.carryBillCnt > 0 ? `<br><small style="color:#fbbf24;font-weight:400">+${total.carryBillCnt} เก่า</small>` : ''}</td>
+          <td class="num" style="padding:12px">
+            ${fmtBaht(total.bill1)}<br><small style="opacity:0.7;font-weight:400">${total.bill1PaidCnt}/${total.bill1Cnt}</small>
+            ${total.carryBill1Cnt > 0 ? `<br><small style="color:#fbbf24;font-weight:600">⏳ +${fmtBaht(total.carryBill1Total)}</small>` : ''}
+          </td>
+          <td class="num" style="padding:12px">
+            ${fmtBaht(total.bill2)}<br><small style="opacity:0.7;font-weight:400">${total.bill2PaidCnt}/${total.bill2Cnt}</small>
+            ${total.carryBill2Cnt > 0 ? `<br><small style="color:#fbbf24;font-weight:600">⏳ +${fmtBaht(total.carryBill2Total)}</small>` : ''}
+          </td>
+          <td class="num" style="padding:12px">${fmtBaht(total.grandTotalBill)}</td>
+          <td class="num" style="padding:12px;color:#a7f3d0">${total.totalPaid > 0 ? fmtBaht(total.totalPaid) : '—'}</td>
+          <td class="num" style="padding:12px;color:#fbbf24">
+            ${total.grandTotalPending > 0 ? fmtBaht(total.grandTotalPending) : '—'}
+            ${total.carryBillTotal > 0 ? `<br><small style="opacity:0.85;font-weight:400">(รวมค้างเก่า ${fmtBaht(total.carryBillTotal)})</small>` : ''}
+          </td>
           <td class="num" style="padding:12px">${totalPct}%</td>
           <td class="num" style="padding:12px">${
             total.carryOut > 0.01
@@ -2336,7 +2404,7 @@ async function closeFleetPeriod(year, month, half) {
   const p = parsePeriod(`${month}.${half}/${year}`);
   const allData = await fetchAllTrucksPeriod(p);
   const trucks = allData.map(d => {
-    const sum = computeTruckSummary(d.truck, d.trips, d.outs, d.incs, d.fp, d.billStatusByCnt || {}, d.extras || []);
+    const sum = computeTruckSummary(d.truck, d.trips, d.outs, d.incs, d.fp, d.billStatusByCnt || {}, d.extras || [], d.carryUnpaid || []);
     return { plate: d.truck.plate, driver: d.truck.driver_name, carryOut: sum.carryOut, reviewed: sum.reviewed };
   });
   setStatus(null);
