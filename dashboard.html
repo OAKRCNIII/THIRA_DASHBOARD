@@ -1296,7 +1296,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
     const label = t.factory || `[${key}] ${t.invoice_no || ''}`;
     const warn = price ? '' : ' ⚠️';
     return `<tr class="row-trip">
-      <td class="cat">ค่าพิเศษ</td>
+      <td class="cat">ค่าเที่ยว</td>
       <td>${fmtThaiDate(t.date_in)}</td>
       <td>${esc(label.slice(0,30))}${warn}<br><small class="muted">${esc(t.invoice_no || '')} • ${esc(t.container_no || '')}</small></td>
       <td class="num">${fmtLiter(target)}</td>
@@ -1307,7 +1307,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
       <td class="num">—</td>
     </tr>`;
   });
-  if (trips.length === 0) tripRows.push('<tr class="row-trip"><td class="cat">ค่าพิเศษ</td><td colspan="8" class="empty">— ไม่มีเที่ยวรอบนี้ —</td></tr>');
+  if (trips.length === 0) tripRows.push('<tr class="row-trip"><td class="cat">ค่าเที่ยว</td><td colspan="8" class="empty">— ไม่มีเที่ยวรอบนี้ —</td></tr>');
 
   // Extra trips rows (เที่ยวพิเศษ — งานนอก)
   const extraRows = extras.map(e => `<tr class="row-extra">

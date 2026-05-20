@@ -312,7 +312,7 @@ function renderTruckPage(truck, p, data, pay) {
     const fee = pr ? Number(pr.fee_driver || 0) : 0;
     const label = t.factory || `[${(t.invoice_no||'').slice(0,3)}] ${t.invoice_no || ''}`;
     return `<tr class="row-trip">
-      <td class="cat">ค่าพิเศษ</td>
+      <td class="cat">ค่าเที่ยว</td>
       <td>${fmtDate(t.date_in)}</td>
       <td>${esc(label.slice(0,28))}<br><small class="muted">${esc(t.invoice_no||'')} • ${esc(t.container_no||'')}</small></td>
       <td class="num">${fmtLiter(target)}</td>
@@ -322,7 +322,7 @@ function renderTruckPage(truck, p, data, pay) {
       <td class="num">—</td>
       <td class="num">—</td>
     </tr>`;
-  }).join('') || '<tr class="row-trip"><td class="cat">ค่าพิเศษ</td><td colspan="8" style="color:#888;text-align:center">— ไม่มีเที่ยวรอบนี้ —</td></tr>';
+  }).join('') || '<tr class="row-trip"><td class="cat">ค่าเที่ยว</td><td colspan="8" style="color:#888;text-align:center">— ไม่มีเที่ยวรอบนี้ —</td></tr>';
 
   // Extra trips
   const extraRows = data.extras.map(e => `<tr class="row-extra">
