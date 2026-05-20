@@ -2684,13 +2684,16 @@ async function deleteOutcome(id) {
 }
 
 /**
- * แก้ note ของ outcome — prompt input ขึ้นมาให้ใส่ note ใหม่
- * ไม่ต้องใช้ delete PIN เพราะแค่แก้ข้อความ ไม่ใช่ลบข้อมูล
+ * แก้ note ของ outcome
+ * Flow: prompt note ใหม่ → ใส่ PIN ยืนยัน → update DB
+ * ใช้ PIN เพราะ "แก้ข้อมูลใน DB" ก็ต้อง audit เหมือน "ลบ"
  */
 async function editOutcomeNote(id, currentNote) {
   const newNote = prompt('แก้หมายเหตุ:', currentNote || '');
   if (newNote === null) return;                    // user กด Cancel
   if (newNote.trim() === (currentNote || '').trim()) return;   // ไม่มีการเปลี่ยน
+  // ใส่ PIN ก่อนเขียน DB (ใช้ modal เดียวกับการลบ)
+  if (!(await requireDeleteCode())) return;
   try {
     const r = await ths.from('outcomes').update({ note: newNote.trim() || null }).eq('id', id);
     if (r.error) throw r.error;
