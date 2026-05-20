@@ -13,7 +13,13 @@
      1mm @ 96dpi ≈ 3.78px → 277mm ≈ 1047px, 190mm ≈ 718px
      ───────────────────────────────────────────────────── */
   @page { size: A4 landscape; margin: 10mm; }
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+    /* บังคับให้พิมพ์สีพื้นหลัง (กัน browser default ที่ไม่พิมพ์ bg) */
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
   body { font-family: 'Sarabun', sans-serif; margin: 0; color: #222; background: #f0f2f5; }
 
   .toolbar { background: white; padding: 14px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);

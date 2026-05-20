@@ -684,6 +684,12 @@
   /* ── Print (per-truck): A4 portrait, อ่านง่าย, ปล่อยให้ flow หลายหน้าได้ ── */
   @page { size: A4 portrait; margin: 12mm; }
   @media print {
+    /* บังคับให้พิมพ์สีพื้นหลัง (กัน Chrome default ที่ไม่พิมพ์ bg) */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     body { background: white; padding: 0; margin: 0; font-size: 12px; }
     .toolbar, .tabs, .footer, .report-actions { display: none !important; }
     .goto-input-hint, .extra-form, .input-sections, .recent-sections { display: none !important; }
