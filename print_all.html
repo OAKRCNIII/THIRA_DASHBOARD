@@ -8,7 +8,11 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <script src="auth.js"></script>
 <style>
-  @page { size: A4 portrait; margin: 12mm; }
+  /* ─── ขนาดกระดาษ ──────────────────────────────────────────
+     A4 landscape: 297mm × 210mm — เนื้อหาหลังหัก margin ≈ 277×190mm
+     1mm @ 96dpi ≈ 3.78px → 277mm ≈ 1047px, 190mm ≈ 718px
+     ───────────────────────────────────────────────────── */
+  @page { size: A4 landscape; margin: 10mm; }
   * { box-sizing: border-box; }
   body { font-family: 'Sarabun', sans-serif; margin: 0; color: #222; background: #f0f2f5; }
 
@@ -20,9 +24,27 @@
   .btn-print { background: #1e3a5f; color: white; }
   .btn-back { background: #6b7280; color: white; text-decoration: none; display: inline-block; }
 
-  .container { padding: 20px; max-width: 800px; margin: 0 auto; }
-  .page { background: white; padding: 24px 28px; margin-bottom: 14px; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); page-break-after: always; }
+  /* container — landscape preview size on screen */
+  .container { padding: 20px; max-width: 1100px; margin: 0 auto; }
+  .page {
+    background: white;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    page-break-after: always;
+    page-break-inside: avoid;
+    /* fixed size = A4 landscape content area → JS วัด overflow ได้แม่น */
+    width: 277mm;
+    min-height: 190mm;
+    max-height: 190mm;
+    overflow: hidden;          /* กัน content ล้น (JS จะ scale ลงให้พอดี) */
+    /* ใช้ transform-origin top-left เพื่อให้ scale ลงไม่เลื่อน */
+    transform-origin: top left;
+  }
   .page:last-child { page-break-after: auto; }
+  /* wrapper ที่จะถูก scale (เป็น child ของ .page เพื่อไม่ให้ scale กระทบ page dimensions) */
+  .page-inner { width: 100%; height: 100%; }
 
   /* SUMMARY PAGE */
   .summary-header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color: white;
@@ -38,16 +60,19 @@
   .sum-table tfoot td { padding: 11px 10px; background: #1e3a5f; color: white; font-weight: 700; font-size: 16px; }
   .sum-table tfoot td.num { text-align: right; font-size: 18px; }
 
-  /* TRUCK PAGE */
+  /* TRUCK PAGE — landscape layout (header + 2 columns) */
   .truck-header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color: white;
-    padding: 14px 20px; border-radius: 6px; margin: -8px -8px 14px -8px;
+    padding: 10px 16px; border-radius: 6px; margin: 0 0 10px 0;
     display: flex; justify-content: space-between; align-items: center; }
-  .truck-header h2 { font-size: 22px; margin: 0; }
-  .truck-header .sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
-  .truck-header .period { font-size: 16px; font-weight: 600; }
+  .truck-header h2 { font-size: 18px; margin: 0; }
+  .truck-header .sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+  .truck-header .period { font-size: 14px; font-weight: 600; }
 
-  table.main { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
-  table.main thead th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
+  /* 2-column layout: left = table, right = payslip */
+  .truck-body { display: grid; grid-template-columns: 1fr 280px; gap: 12px; align-items: start; }
+
+  table.main { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.main thead th { background: #1e3a5f; color: white; padding: 5px 7px; text-align: left; font-size: 11px; }
   table.main thead th.num { text-align: right; }
   table.main tbody td { padding: 5px 7px; border-top: 1px solid #eee; vertical-align: top; font-variant-numeric: tabular-nums; }
   table.main tbody td.num { text-align: right; }
@@ -60,43 +85,30 @@
   table.main tfoot td { background: #1e3a5f; color: white; padding: 8px; font-weight: 700; }
   small.muted { color: #888; font-size: 9px; }
 
-  .payslip { background: white; padding: 14px 20px; margin-top: 14px; border-radius: 8px; border: 2px solid #1e3a5f; page-break-inside: avoid; }
-  .payslip h2 { font-size: 15px; color: #1e3a5f; margin: 0 0 8px; }
-  .payslip-grid { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; font-size: 13px; }
+  .payslip { background: white; padding: 12px 14px; border-radius: 8px; border: 2px solid #1e3a5f; }
+  .payslip h2 { font-size: 13px; color: #1e3a5f; margin: 0 0 8px; }
+  .payslip-grid { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 12px; }
   .payslip-grid .lbl { color: #555; }
   .payslip-grid .val { text-align: right; font-variant-numeric: tabular-nums; }
-  .payslip-grid .total { border-top: 2px solid #1e3a5f; margin-top: 6px; padding-top: 6px; font-size: 18px; font-weight: 700; color: #1e3a5f; }
+  .payslip-grid .total { border-top: 2px solid #1e3a5f; margin-top: 6px; padding-top: 6px; font-size: 15px; font-weight: 700; color: #1e3a5f; }
 
   @media print {
-    body { background: white; padding: 0; font-size: 11px; }
+    body { background: white; padding: 0; }
     .toolbar { display: none; }
     .container { padding: 0; max-width: none; }
-    .page { box-shadow: none; margin: 0; padding: 0; border-radius: 0; page-break-inside: avoid; page-break-after: always; }
-    .page:last-child { page-break-after: auto; }
+    .page {
+      box-shadow: none;
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+      width: 100%;
+      min-height: auto;
+      max-height: none;
+      overflow: visible;
+    }
     .summary-header { border-radius: 0; margin: 0 0 10px 0; padding: 12px 16px; }
     .summary-header h1 { font-size: 20px; }
     .truck-header { border-radius: 0; margin: 0 0 8px 0; padding: 10px 14px; }
-    .truck-header h2 { font-size: 18px; }
-    .truck-header .sub, .truck-header .period { font-size: 11px; }
-
-    /* Compact main table for print */
-    table.main thead th { padding: 4px 6px; font-size: 10px; }
-    table.main tbody td { padding: 3px 6px; font-size: 10px; }
-    table.main tbody td.cat { padding: 3px; font-size: 9px; }
-    table.main tfoot td { padding: 5px 6px; font-size: 11px; }
-    table.main small.muted { font-size: 8px; }
-
-    /* Compact payslip */
-    .payslip { padding: 10px 14px; margin-top: 8px; page-break-inside: avoid; }
-    .payslip h2 { font-size: 13px; margin-bottom: 6px; }
-    .payslip-grid { font-size: 11px; gap: 2px 10px; }
-    .payslip-grid .total { font-size: 15px; padding-top: 4px; margin-top: 4px; }
-
-    /* Summary table compact */
-    .sum-table thead th { padding: 6px 8px; font-size: 11px; }
-    .sum-table tbody td { padding: 6px 8px; font-size: 11px; }
-    .sum-table tfoot td { padding: 8px; font-size: 13px; }
-    .sum-table tfoot td.num { font-size: 15px; }
   }
 </style>
 </head>
@@ -217,28 +229,30 @@ function renderSummaryPage(p, summaries) {
   }).join('');
   return `
   <div class="page">
-    <div class="summary-header">
-      <h1>📋 สรุปต้องโอนให้คนขับ — รอบ ${p.month}.${p.half}/${p.year}</h1>
-      <div class="sub">${periodLabel}</div>
-    </div>
-    <table class="sum-table">
-      <thead>
-        <tr>
-          <th>รถ</th><th>คนขับ</th>
-          <th class="num">เที่ยว</th>
-          <th class="num">ค่าเที่ยว</th>
-          <th class="num">ค่าล่วง</th>
-          <th class="num">เงินเดือน</th>
-          <th class="num">รวมต้องโอน</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-      <tfoot>
-        <tr><td colspan="6">💼 รวมต้องโอนทั้งฝูง (6 คน)</td><td class="num">${fmtBaht(grandTotal)} บ.</td></tr>
-      </tfoot>
-    </table>
-    <div style="margin-top:14px;font-size:12px;color:#666">
-      💡 รอบ .2 (ครึ่งหลังของเดือน) จะรวม เงินเดือน base • ใช้สำหรับโอนเงินเข้าบัญชีคนขับ
+    <div class="page-inner">
+      <div class="summary-header">
+        <h1>📋 สรุปต้องโอนให้คนขับ — รอบ ${p.month}.${p.half}/${p.year}</h1>
+        <div class="sub">${periodLabel}</div>
+      </div>
+      <table class="sum-table">
+        <thead>
+          <tr>
+            <th>รถ</th><th>คนขับ</th>
+            <th class="num">เที่ยว</th>
+            <th class="num">ค่าเที่ยว</th>
+            <th class="num">ค่าล่วง</th>
+            <th class="num">เงินเดือน</th>
+            <th class="num">รวมต้องโอน</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td colspan="6">💼 รวมต้องโอนทั้งฝูง (6 คน)</td><td class="num">${fmtBaht(grandTotal)} บ.</td></tr>
+        </tfoot>
+      </table>
+      <div style="margin-top:14px;font-size:12px;color:#666">
+        💡 รอบ .2 (ครึ่งหลังของเดือน) จะรวม เงินเดือน base • ใช้สำหรับโอนเงินเข้าบัญชีคนขับ
+      </div>
     </div>
   </div>
   `;
@@ -317,50 +331,100 @@ function renderTruckPage(truck, p, data, pay) {
   const otherTotal = others.reduce((s,o) => s + Number(o.amount), 0);
 
   return `
-  <div class="page">
-    <div class="truck-header">
-      <div>
-        <h2>🚛 ${esc(truck.plate)} — ${esc(truck.driver_name)}</h2>
-        <div class="sub">ใช้ลิตรชุดที่ ${truck.fuel_route} • เงินเดือน ${fmtBaht(pay.baseSal)}/เดือน</div>
+  <div class="page truck-page">
+    <div class="page-inner">
+      <div class="truck-header">
+        <div>
+          <h2>🚛 ${esc(truck.plate)} — ${esc(truck.driver_name)}</h2>
+          <div class="sub">ใช้ลิตรชุดที่ ${truck.fuel_route} • เงินเดือน ${fmtBaht(pay.baseSal)}/เดือน</div>
+        </div>
+        <div style="text-align:right">
+          <div class="period">${THAI_MONTHS[p.month]} ${p.year + 543} ${p.month}.${p.half}</div>
+          <div class="sub">${p.halfLabel}</div>
+        </div>
       </div>
-      <div style="text-align:right">
-        <div class="period">${THAI_MONTHS[p.month]} ${p.year + 543} ${p.month}.${p.half}</div>
-        <div class="sub">${p.halfLabel}</div>
-      </div>
-    </div>
 
-    <table class="main">
-      <thead><tr>
-        <th></th><th>วันที่</th><th>รายการ</th>
-        <th class="num">ลิตร</th><th class="num">บาท(น้ำมัน)</th>
-        <th class="num">ค่าเที่ยว</th><th class="num">ค่าล่วง</th><th class="num">เงินเดือน</th><th class="num">อื่นๆ</th>
-      </tr></thead>
-      <tbody>${tripRows}${extraRows}${refillRows}${otherRows}${paidRows}</tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3">รวม ${esc(truck.driver_name)}</td>
-          <td class="num">—</td>
-          <td class="num">—</td>
-          <td class="num">${fmtBaht(pay.tripFee)}</td>
-          <td class="num">—</td>
-          <td class="num">—</td>
-          <td class="num">—</td>
-        </tr>
-      </tfoot>
-    </table>
+      <div class="truck-body">
+        <table class="main">
+          <thead><tr>
+            <th></th><th>วันที่</th><th>รายการ</th>
+            <th class="num">ลิตร</th><th class="num">บาท(น้ำมัน)</th>
+            <th class="num">ค่าเที่ยว</th><th class="num">ค่าล่วง</th><th class="num">เงินเดือน</th><th class="num">อื่นๆ</th>
+          </tr></thead>
+          <tbody>${tripRows}${extraRows}${refillRows}${otherRows}${paidRows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">รวม ${esc(truck.driver_name)}</td>
+              <td class="num">—</td>
+              <td class="num">—</td>
+              <td class="num">${fmtBaht(pay.tripFee)}</td>
+              <td class="num">—</td>
+              <td class="num">—</td>
+              <td class="num">—</td>
+            </tr>
+          </tfoot>
+        </table>
 
-    <div class="payslip">
-      <h2>💰 รวมต้องจ่ายให้ ${esc(truck.driver_name)} รอบนี้</h2>
-      <div class="payslip-grid">
-        <div class="lbl">ค่าเที่ยว (จาก ${pay.tripCount} เที่ยว × PRICE)</div><div class="val">${fmtBaht(pay.tripFee)}</div>
-        <div class="lbl">ค่าล่วง</div><div class="val">${pay.driverOT > 0 ? fmtBaht(pay.driverOT) : '—'}</div>
-        <div class="lbl">เงินเดือน ${p.half === 2 ? `(${fmtBaht(pay.baseSal)} ต่อเดือน — จ่ายครึ่งหลัง)` : '(ครึ่งแรก — รอจ่ายครึ่งหลัง)'}</div><div class="val">${pay.driverSalary > 0 ? fmtBaht(pay.driverSalary) : '—'}</div>
-        <div class="lbl">อื่นๆ ที่จ่ายคนขับ</div><div class="val">—</div>
-        <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(pay.payslipTotal)} บ.</div>
+        <div class="payslip">
+          <h2>💰 รวมต้องจ่ายให้ ${esc(truck.driver_name)}</h2>
+          <div class="payslip-grid">
+            <div class="lbl">ค่าเที่ยว (${pay.tripCount} เที่ยว)</div><div class="val">${fmtBaht(pay.tripFee)}</div>
+            <div class="lbl">ค่าล่วง</div><div class="val">${pay.driverOT > 0 ? fmtBaht(pay.driverOT) : '—'}</div>
+            <div class="lbl">เงินเดือน ${p.half === 2 ? `(${fmtBaht(pay.baseSal)}/เดือน)` : '(ครึ่งแรก — รอ)'}</div><div class="val">${pay.driverSalary > 0 ? fmtBaht(pay.driverSalary) : '—'}</div>
+            <div class="lbl">อื่นๆ</div><div class="val">—</div>
+            <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(pay.payslipTotal)} บ.</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
   `;
+}
+
+/**
+ * autoFitPages — บีบ content ของแต่ละ .page ให้พอดี A4 landscape
+ *
+ * เทคนิค: ใช้ CSS transform scale บน .page-inner
+ * - วัด scrollHeight ของ .page-inner เปรียบเทียบกับ clientHeight ของ .page
+ * - ถ้าเกิน → คำนวณ scale = pageH / innerH (กับ width ด้วย เผื่อ table กว้าง)
+ * - apply transform: scale(s)  + width compensation (เพื่อให้ใช้พื้นที่เต็ม)
+ *
+ * ทำงานทั้งบนจอ (preview) และตอน print
+ */
+function autoFitPages() {
+  const pages = document.querySelectorAll('.page');
+  pages.forEach(page => {
+    const inner = page.querySelector('.page-inner');
+    if (!inner) return;
+    // reset ก่อน วัด natural size
+    inner.style.transform = '';
+    inner.style.width = '';
+    inner.style.height = '';
+
+    // วัด available + content
+    const pageStyle = getComputedStyle(page);
+    const padTop = parseFloat(pageStyle.paddingTop);
+    const padBot = parseFloat(pageStyle.paddingBottom);
+    const padLeft = parseFloat(pageStyle.paddingLeft);
+    const padRight = parseFloat(pageStyle.paddingRight);
+    const availH = page.clientHeight - padTop - padBot;
+    const availW = page.clientWidth - padLeft - padRight;
+
+    const contentH = inner.scrollHeight;
+    const contentW = inner.scrollWidth;
+
+    const scaleH = availH / contentH;
+    const scaleW = availW / contentW;
+    const scale = Math.min(scaleH, scaleW, 1);  // ไม่ขยายเกิน 100%
+
+    if (scale < 1) {
+      // ขยาย wrapper เพื่อให้ scaled-down content ยังเต็มพื้นที่
+      inner.style.transformOrigin = 'top left';
+      inner.style.transform = `scale(${scale})`;
+      inner.style.width = `${100 / scale}%`;
+      inner.style.height = `${availH / scale}px`;
+    }
+  });
 }
 
 async function reload() {
@@ -381,11 +445,22 @@ async function reload() {
       html += renderTruckPage(s.truck, p, s.data, s.pay);
     }
     document.getElementById('report').innerHTML = html;
+    // รอ font + layout settle แล้วค่อย fit (2 ครั้ง เผื่อ font load lag)
+    await new Promise(r => requestAnimationFrame(r));
+    autoFitPages();
+    setTimeout(autoFitPages, 200);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => setTimeout(autoFitPages, 50));
+    }
   } catch (e) {
     document.getElementById('report').innerHTML = `<div style="padding:30px;color:#c53030">❌ ${e.message}</div>`;
     console.error(e);
   }
 }
+
+// re-fit ก่อนพิมพ์ (กัน font / image โหลดช้า)
+window.addEventListener('beforeprint', autoFitPages);
+window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(autoFitPages, 150); });
 
 // URL param support: print_all.html?period=5.2/2026
 const urlPeriod = new URLSearchParams(location.search).get('period');
