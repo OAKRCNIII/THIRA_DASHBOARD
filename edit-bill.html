@@ -252,8 +252,8 @@
 const LIFF_ID = '2010143466-aLC1cB9H';
 const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
-// Endpoint ของ edge function ที่รับการ submit form
-const EDIT_ENDPOINT = 'https://ywslgrusflfuxtrtvlfu.supabase.co/functions/v1/line-edit-bill';
+// Endpoint ของ edge function ที่รับการ submit form (project เดียวกับ DB)
+const EDIT_ENDPOINT = 'https://eurnevjtzxansothqney.supabase.co/functions/v1/line-edit-bill';
 
 const $ = id => document.getElementById(id);
 const showError = msg => { $('error-msg').textContent = '❌ ' + msg; $('error-msg').style.display = 'block'; $('loading-msg').style.display = 'none'; };
