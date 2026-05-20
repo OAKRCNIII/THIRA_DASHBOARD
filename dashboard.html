@@ -2049,7 +2049,12 @@ function _truckOpts(defaultPlate) {
 function addBatchRow(kind, presetPlate, presetDate, presetData) {
   const rid = __rowCounter++;
   const tbody = document.getElementById(`${kind}-rows`);
-  const plate = presetPlate || document.getElementById('input-truck-plate').value;
+  // input-truck-plate มีเฉพาะใน "บันทึกรายจ่าย" view — income view ไม่มี → ใช้ optional chaining
+  const plate = presetPlate
+    || document.getElementById('input-truck-plate')?.value
+    || currentPlate
+    || (cache.trucks && cache.trucks[0] && cache.trucks[0].plate)
+    || '';
   const p = parsePeriod(document.getElementById('period-input').value);
   const date = presetDate || p.start;
   const truckCell = `<td><select id="${kind}-plate-${rid}">${_truckOpts(plate)}</select></td>`;
