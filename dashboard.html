@@ -900,27 +900,38 @@ async function loadCache() {
 }
 
 async function fetchTruckPeriod(plate, start, end, year, month, half) {
-  const [trips, outs, incs, fp, extras] = await Promise.all([
+  // ค้นย้อนหลัง 90 วันก่อน period start → หา trips ที่ค้างจ่าย
+  const lookback = new Date(start);
+  lookback.setDate(lookback.getDate() - 90);
+  const carryStart = lookback.toISOString().slice(0, 10);
+
+  const [trips, outs, incs, fp, extras, carryRes] = await Promise.all([
     sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', start).lte('date_in', end).order('date_in'),
     ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end).order('date'),
     ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end),
     ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', year).eq('month', month).eq('half', half).maybeSingle(),
-    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end).order('date')
+    ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', start).lte('date', end).order('date'),
+    // Trips ก่อนหน้า period นี้ — 90 วันย้อนหลัง — จะ filter เอาเฉพาะที่ยังไม่จ่าย
+    sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', carryStart).lt('date_in', start).order('date_in')
   ]);
   if (trips.error) throw trips.error;
   if (outs.error)  throw outs.error;
   if (incs.error)  throw incs.error;
   if (fp.error)    throw fp.error;
   if (extras.error) throw extras.error;
+  if (carryRes.error) throw carryRes.error;
 
   // หา paid status จาก ANTS Supabase (optional — ถ้ามี key)
-  const containerNos = trips.data.map(t => t.container_no).filter(Boolean);
+  // รวม container_no ของทั้ง current + carry → query ครั้งเดียว
+  const allContainerNos = [...trips.data, ...carryRes.data]
+    .map(t => t.container_no)
+    .filter(Boolean);
   let billStatusByCnt = {};
-  if (ants && containerNos.length > 0) {
+  if (ants && allContainerNos.length > 0) {
     try {
       const billsRes = await ants.from('transport_bills')
         .select('container_no,invoice_no,bill_no,price,source,is_paid,bill_date')
-        .in('container_no', containerNos);
+        .in('container_no', allContainerNos);
       if (!billsRes.error) {
         billsRes.data.forEach(b => {
           billStatusByCnt[b.container_no] = b;
@@ -929,7 +940,16 @@ async function fetchTruckPeriod(plate, start, end, year, month, half) {
     } catch (e) { console.warn('ANTS fetch failed (continue without paid status):', e); }
   }
 
-  return { trips: trips.data, outs: outs.data, incs: incs.data, fp: fp.data, billStatusByCnt, extras: extras.data };
+  // Filter carry trips → เฉพาะที่ยังไม่จ่าย (ไม่มี bill_no ใน ANTS)
+  const carryUnpaid = carryRes.data.filter(t => {
+    const b = billStatusByCnt[t.container_no];
+    return !(b && b.bill_no);   // ไม่มี ANTS bill record หรือ ANTS ยังไม่วางบิล → ค้าง
+  });
+
+  return {
+    trips: trips.data, outs: outs.data, incs: incs.data, fp: fp.data,
+    billStatusByCnt, extras: extras.data, carryUnpaid
+  };
 }
 
 // ─── Render ───────────────────────────────────────────────
@@ -1155,11 +1175,24 @@ function renderOverview(p, allData) {
   `;
 }
 
-function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras) {
+function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, carryUnpaid) {
   const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   billStatusByCnt = billStatusByCnt || {};
   extras = extras || [];
+  carryUnpaid = carryUnpaid || [];
   const extraLiters = extras.reduce((s, e) => s + Number(e.liters || 0), 0);
+
+  // ── Carryover bills (trips ค้างจากรอบก่อน) ──
+  const carryBill1 = [], carryBill2 = [];
+  let carryBill1Total = 0, carryBill2Total = 0;
+  for (const t of carryUnpaid) {
+    const billInfo = billPriceForTrip(t, cache.factoryMap, cache.priceSets);
+    const antsBill = billStatusByCnt[t.container_no] || null;
+    const billAmt = (antsBill && antsBill.price) ? Number(antsBill.price) : billInfo.amount;
+    const tripData = {...t, billAmt, factoryName: billInfo.factoryName, antsBill, isPaid: false, isCarry: true};
+    if (isBill1(t)) { carryBill1.push(tripData); carryBill1Total += billAmt; }
+    else            { carryBill2.push(tripData); carryBill2Total += billAmt; }
+  }
 
   // Trip rows + billing
   let tripTarget = 0, tripFee = 0;
@@ -1419,42 +1452,78 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras) 
     </div>
 
     <div class="panel billing-panel" style="margin-bottom:12px">
-      <h3>📋 วางบิล ANTS รอบนี้  <small style="font-weight:400;color:#888;font-size:12px">(✓ = ANTS จ่ายแล้ว)</small></h3>
+      <h3>📋 วางบิล ANTS  <small style="font-weight:400;color:#888;font-size:12px">(✓ = ANTS จ่ายแล้ว • ⏳ = ค้างจากรอบก่อน)</small></h3>
       <div class="bills">
-        <div class="bill bill1">
-          <div class="bill-head"><strong>บิล 1: OGM + KNT</strong>  <span class="bill-count">${bill1Trips.length} เที่ยว • จ่ายแล้ว ${bill1Trips.filter(t=>t.isPaid).length}/${bill1Trips.length}</span></div>
-          ${bill1Trips.length === 0 ? '<div class="bill-empty">— ไม่มีเที่ยว OGM/KNT รอบนี้ —</div>' :
-            '<table class="bill-table"><tbody>' +
-            bill1Trips.map(t => `<tr class="${t.isPaid ? 'paid' : ''}">
-              <td>${t.isPaid ? '<span class="pay-mark paid">✓</span>' : '<span class="pay-mark">○</span>'}</td>
-              <td>${fmtThaiDate(t.date_in)}</td>
-              <td>${esc(t.factoryName || '?')}</td>
-              <td><small>${esc(t.invoice_no || '')}${t.antsBill && t.antsBill.bill_no ? ' • ' + esc(t.antsBill.bill_no) : ''}</small></td>
-              <td class="num">${fmtBaht(t.billAmt)}</td>
-            </tr>`).join('') +
-            '</tbody></table>'}
-          <div class="bill-total">
-            จ่ายแล้ว: ${fmtBaht(bill1Paid)} / ค้าง: <strong>${fmtBaht(bill1Total - bill1Paid)}</strong> / รวม ${fmtBaht(bill1Total)} บ.
-          </div>
-        </div>
-        <div class="bill bill2">
-          <div class="bill-head"><strong>บิล 2: โรงงานอื่นๆ</strong>  <span class="bill-count">${bill2Trips.length} เที่ยว • จ่ายแล้ว ${bill2Trips.filter(t=>t.isPaid).length}/${bill2Trips.length}</span></div>
-          ${bill2Trips.length === 0 ? '<div class="bill-empty">— ไม่มีเที่ยวอื่นรอบนี้ —</div>' :
-            '<table class="bill-table"><tbody>' +
-            bill2Trips.map(t => `<tr class="${t.isPaid ? 'paid' : ''}">
-              <td>${t.isPaid ? '<span class="pay-mark paid">✓</span>' : '<span class="pay-mark">○</span>'}</td>
-              <td>${fmtThaiDate(t.date_in)}</td>
-              <td>${esc(t.factoryName || '?')}</td>
-              <td><small>${esc(t.invoice_no || '')}${t.antsBill && t.antsBill.bill_no ? ' • ' + esc(t.antsBill.bill_no) : ''}</small></td>
-              <td class="num">${fmtBaht(t.billAmt)}</td>
-            </tr>`).join('') +
-            '</tbody></table>'}
-          <div class="bill-total">
-            จ่ายแล้ว: ${fmtBaht(bill2Paid)} / ค้าง: <strong>${fmtBaht(bill2Total - bill2Paid)}</strong> / รวม ${fmtBaht(bill2Total)} บ.
-          </div>
-        </div>
+        ${(() => {
+          const renderCarryBlock = (carryList, carryTotal) => {
+            if (!carryList.length) return '';
+            return `
+              <div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:8px 10px;margin-bottom:8px;border-radius:6px">
+                <div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:6px">
+                  ⏳ ค้างจากรอบก่อน ${carryList.length} เที่ยว • ${fmtBaht(carryTotal)} บ.
+                </div>
+                <table class="bill-table"><tbody>
+                  ${carryList.map(t => `<tr>
+                    <td><span class="pay-mark" style="background:#f59e0b;color:white">⏳</span></td>
+                    <td>${fmtThaiDate(t.date_in)}</td>
+                    <td>${esc(t.factoryName || '?')}</td>
+                    <td><small>${esc(t.invoice_no || '')}</small></td>
+                    <td class="num">${fmtBaht(t.billAmt)}</td>
+                  </tr>`).join('')}
+                </tbody></table>
+              </div>`;
+          };
+          const renderCurrentTable = (list) => {
+            if (!list.length) return '<div class="bill-empty">— ไม่มีเที่ยวรอบนี้ —</div>';
+            return '<table class="bill-table"><tbody>' +
+              list.map(t => `<tr class="${t.isPaid ? 'paid' : ''}">
+                <td>${t.isPaid ? '<span class="pay-mark paid">✓</span>' : '<span class="pay-mark">○</span>'}</td>
+                <td>${fmtThaiDate(t.date_in)}</td>
+                <td>${esc(t.factoryName || '?')}</td>
+                <td><small>${esc(t.invoice_no || '')}${t.antsBill && t.antsBill.bill_no ? ' • ' + esc(t.antsBill.bill_no) : ''}</small></td>
+                <td class="num">${fmtBaht(t.billAmt)}</td>
+              </tr>`).join('') +
+              '</tbody></table>';
+          };
+
+          const bill1GrandTotal = bill1Total + carryBill1Total;
+          const bill1Pending = (bill1Total - bill1Paid) + carryBill1Total;
+          const bill2GrandTotal = bill2Total + carryBill2Total;
+          const bill2Pending = (bill2Total - bill2Paid) + carryBill2Total;
+
+          return `
+            <div class="bill bill1">
+              <div class="bill-head">
+                <strong>บิล 1: OGM + KNT</strong>
+                <span class="bill-count">รอบนี้ ${bill1Trips.length} เที่ยว • จ่ายแล้ว ${bill1Trips.filter(t=>t.isPaid).length}/${bill1Trips.length}${carryBill1.length ? ` • <span style="color:#92400e">ค้างเก่า ${carryBill1.length}</span>` : ''}</span>
+              </div>
+              ${renderCarryBlock(carryBill1, carryBill1Total)}
+              ${renderCurrentTable(bill1Trips)}
+              <div class="bill-total">
+                จ่ายแล้ว ${fmtBaht(bill1Paid)} / ค้าง <strong>${fmtBaht(bill1Pending)}</strong> / รวม ${fmtBaht(bill1GrandTotal)} บ.
+              </div>
+            </div>
+            <div class="bill bill2">
+              <div class="bill-head">
+                <strong>บิล 2: โรงงานอื่นๆ</strong>
+                <span class="bill-count">รอบนี้ ${bill2Trips.length} เที่ยว • จ่ายแล้ว ${bill2Trips.filter(t=>t.isPaid).length}/${bill2Trips.length}${carryBill2.length ? ` • <span style="color:#92400e">ค้างเก่า ${carryBill2.length}</span>` : ''}</span>
+              </div>
+              ${renderCarryBlock(carryBill2, carryBill2Total)}
+              ${renderCurrentTable(bill2Trips)}
+              <div class="bill-total">
+                จ่ายแล้ว ${fmtBaht(bill2Paid)} / ค้าง <strong>${fmtBaht(bill2Pending)}</strong> / รวม ${fmtBaht(bill2GrandTotal)} บ.
+              </div>
+            </div>
+          `;
+        })()}
       </div>
-      <div class="bill-grand">รวมวางบิล ANTS รอบนี้: <strong>${fmtBaht(bill1Total + bill2Total)} บ.</strong> • จ่ายแล้ว ${fmtBaht(bill1Paid + bill2Paid)} • <span style="color:#fbbf24">ค้าง ${fmtBaht(bill1Total + bill2Total - bill1Paid - bill2Paid)}</span></div>
+      <div class="bill-grand">
+        รวมวางบิล ANTS:
+        <strong>${fmtBaht(bill1Total + bill2Total + carryBill1Total + carryBill2Total)} บ.</strong> •
+        จ่ายแล้ว ${fmtBaht(bill1Paid + bill2Paid)} •
+        <span style="color:#fbbf24">ค้าง ${fmtBaht((bill1Total - bill1Paid) + (bill2Total - bill2Paid) + carryBill1Total + carryBill2Total)}</span>
+        ${(carryBill1.length + carryBill2.length) > 0 ? `<small style="opacity:0.7">  (รวมค้างเก่า ${carryBill1.length + carryBill2.length} เที่ยว ${fmtBaht(carryBill1Total + carryBill2Total)} บ.)</small>` : ''}
+      </div>
     </div>
 
     <table>
@@ -1550,7 +1619,7 @@ async function reload() {
       if (!truck) throw new Error(`ไม่พบรถ ${currentPlate}`);
       setStatus(`โหลดข้อมูล ${currentPlate} รอบ ${currentPeriod}...`);
       const data = await fetchTruckPeriod(currentPlate, p.start, p.end, p.year, p.month, p.half);
-      document.getElementById('report').innerHTML = renderReport(truck, p, data.trips, data.outs, data.incs, data.fp, data.billStatusByCnt, data.extras);
+      document.getElementById('report').innerHTML = renderReport(truck, p, data.trips, data.outs, data.incs, data.fp, data.billStatusByCnt, data.extras, data.carryUnpaid);
     }
     setStatus(null);
   } catch (e) {
