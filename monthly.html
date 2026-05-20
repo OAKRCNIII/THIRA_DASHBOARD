@@ -190,12 +190,39 @@ async function fetchMonthlyData(year) {
   const start = `${year}-01-01`;
   const end = `${year}-12-31`;
   const [outs, incs] = await Promise.all([
-    ths.from('outcomes').select('truck_plate,date,amount').gte('date', start).lte('date', end),
+    // ดึง category + note ด้วย เพื่อ track annual fees (ประกัน / สุวิทย์ / GPS)
+    ths.from('outcomes').select('truck_plate,date,amount,category,note').gte('date', start).lte('date', end),
     ths.from('incomes').select('truck_plate,date,amount_net').gte('date', start).lte('date', end)
   ]);
   if (outs.error) throw outs.error;
   if (incs.error) throw incs.error;
   return { outs: outs.data, incs: incs.data };
+}
+
+// ─── Annual fee tracking ─────────────────────────────────────────
+// คันไหนจ่ายอะไรแล้วบ้างในปีนี้ — เพื่อแสดง badge ในตาราง
+function computeAnnualStatus(plate, outs) {
+  const ofPlate = outs.filter(o => o.truck_plate === plate && Number(o.amount) > 0);
+  const hasInsurance = ofPlate.some(o => o.category === 'ประกัน');
+  const hasSuvit     = ofPlate.some(o => o.category === 'สุวิทย์');
+  // GPS อยู่ในหมวด "อื่นๆ" + note มีคำว่า "GPS" (case-insensitive)
+  const hasGPS = ofPlate.some(o => /gps/i.test(o.note || ''));
+  return { hasInsurance, hasSuvit, hasGPS };
+}
+
+function annualBadgesHTML(plate, outs) {
+  const s = computeAnnualStatus(plate, outs);
+  const badge = (paid, icon, label) => {
+    const color = paid ? '#15803d' : '#92400e';
+    const bg    = paid ? '#dcfce7' : '#fef3c7';
+    const mark  = paid ? '✓' : '⏳';
+    return `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${bg};color:${color};margin:1px 2px 0 0;white-space:nowrap" title="${paid ? 'จ่ายแล้ว' : 'ยังไม่จ่ายปีนี้'}">${mark} ${icon} ${label}</span>`;
+  };
+  return `<div style="margin-top:4px;line-height:1.6">
+    ${badge(s.hasInsurance, '🛡', 'ประกัน')}
+    ${badge(s.hasSuvit, '👤', 'สุวิทย์')}
+    ${badge(s.hasGPS, '📡', 'GPS')}
+  </div>`;
 }
 
 function renderMonthly(year, data, trucksAll) {
@@ -223,7 +250,11 @@ function renderMonthly(year, data, trucksAll) {
     }).join('');
     const yp = yIn - yOut;
     return `<tr class="clickable" onclick="openTruckDetail('${t.plate}', ${year})">
-      <td><strong>${esc(t.plate)}</strong><br><small class="muted">${esc(t.driver_name)}</small></td>
+      <td>
+        <strong>${esc(t.plate)}</strong><br>
+        <small class="muted">${esc(t.driver_name)}</small>
+        ${annualBadgesHTML(t.plate, data.outs)}
+      </td>
       ${cells}
       <td class="num year-total"><strong class="${yp>=0?'profit-pos':'profit-neg'}">${yp>=0?'+':''}${fmtBaht(yp)}</strong></td>
     </tr>`;
