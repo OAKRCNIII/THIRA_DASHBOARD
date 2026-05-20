@@ -257,29 +257,64 @@ const EDIT_ENDPOINT = 'https://eurnevjtzxansothqney.supabase.co/functions/v1/lin
 
 const $ = id => document.getElementById(id);
 const showError = msg => { $('error-msg').textContent = '❌ ' + msg; $('error-msg').style.display = 'block'; $('loading-msg').style.display = 'none'; };
-const params = new URLSearchParams(location.search);
-const PENDING_ID = params.get('id');
-const TOKEN = params.get('t');
 
 // Pre-fill จาก data ที่ดึงมา
 let originalData = {};
+let PENDING_ID = null;
+let TOKEN = null;
 
-async function init() {
-  if (!PENDING_ID || !TOKEN) {
-    showError('ลิงก์ไม่ถูกต้อง — กลับไปกด "✏️ แก้ไข" ใน LINE ใหม่');
-    return;
+/**
+ * อ่าน params จาก URL — รองรับทั้ง 2 แบบ:
+ *   1. ?id=437&t=xxx              (ปกติ — เปิดจาก Flex URI หรือ browser ตรงๆ)
+ *   2. ?liff.state=%3Fid%3D437... (LIFF SDK encode ตอน user เปิดจาก LINE)
+ */
+function readParams() {
+  // ลองอ่านแบบปกติก่อน
+  const p = new URLSearchParams(location.search);
+  let id = p.get('id');
+  let token = p.get('t');
+
+  // ถ้าไม่เจอ + มี liff.state → decode
+  if ((!id || !token) && p.get('liff.state')) {
+    const state = p.get('liff.state');                  // "?id=437&t=xxx" (decoded แล้วโดย URLSearchParams)
+    const stateParams = new URLSearchParams(state.startsWith('?') ? state.slice(1) : state);
+    id = id || stateParams.get('id');
+    token = token || stateParams.get('t');
   }
 
-  // 1. LIFF init (สำหรับปุ่ม close)
+  // ลอง location.hash (บาง browser/LIFF version)
+  if ((!id || !token) && location.hash) {
+    const h = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+    const hashParams = new URLSearchParams(h.startsWith('?') ? h.slice(1) : h);
+    id = id || hashParams.get('id');
+    token = token || hashParams.get('t');
+  }
+
+  return { id, token };
+}
+
+async function init() {
+  // 1. LIFF init — รอให้ SDK ประมวลผล liff.state ก่อน (ถ้าใช้)
   try {
-    if (LIFF_ID !== '__LIFF_ID_HERE__') {
+    if (typeof liff !== 'undefined' && LIFF_ID && !LIFF_ID.includes('HERE')) {
       await liff.init({ liffId: LIFF_ID });
     }
   } catch (e) {
-    console.warn('LIFF init failed:', e);
+    console.warn('LIFF init failed (continue anyway):', e);
   }
 
-  // 2. ดึงข้อมูลปัจจุบันจาก Supabase (RPC fetch_pending_for_edit)
+  // 2. อ่าน params หลัง LIFF init เสร็จ (URL อาจถูก rewrite แล้ว)
+  const { id, token } = readParams();
+  PENDING_ID = id;
+  TOKEN = token;
+
+  if (!PENDING_ID || !TOKEN) {
+    showError(`ลิงก์ไม่ถูกต้อง — กลับไปกด "✏️ แก้ไข" ใน LINE ใหม่
+URL: ${location.href.slice(0, 80)}...`);
+    return;
+  }
+
+  // 3. ดึงข้อมูลปัจจุบันจาก Supabase (RPC fetch_pending_for_edit)
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fetch_pending_for_edit`, {
       method: 'POST',
