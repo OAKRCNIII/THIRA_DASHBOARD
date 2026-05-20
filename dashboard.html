@@ -678,13 +678,56 @@
     .kpi .value { font-size: 22px; }
   }
 
+  /* ── Print: 1 truck = 1 A4 portrait page (auto-scale to fit) ── */
+  @page { size: A4 portrait; margin: 10mm; }
   @media print {
     body { background: white; padding: 0; margin: 0; }
     .toolbar, .tabs, .footer, .report-actions { display: none !important; }
-    .panels, .billing-panel, .goto-input-hint, .extra-form, .input-sections, .recent-sections { display: none !important; }
-    .header { border-radius: 0; }
+    .goto-input-hint, .extra-form, .input-sections, .recent-sections { display: none !important; }
+
+    /* truck-report = root → ใช้พิมพ์ */
+    .truck-report {
+      transform-origin: top left;
+      width: 190mm;   /* A4 portrait width - 2×10mm margin */
+    }
+    .truck-report .header { border-radius: var(--r-2); margin-bottom: 8px; padding: 12px 16px; }
+    .truck-report .header h1 { font-size: 18px; }
+    .truck-report .header .driver { font-size: 11px; }
+    .truck-report .header-r .period { font-size: 14px; }
+    .truck-report .header-r .period-sub { font-size: 11px; }
+    .truck-report .panels { gap: 8px; margin: 8px 0; }
+    .truck-report .panel { padding: 10px 12px; border-radius: var(--r-2); }
+    .truck-report .panel h3 { font-size: 11px; margin-bottom: 8px; padding-bottom: 6px; }
+    .truck-report .kpis { gap: 6px; }
+    .truck-report .kpi { padding: 10px 12px; }
+    .truck-report .kpi .label { font-size: 9px; margin-bottom: 4px; }
+    .truck-report .kpi .value { font-size: 18px; }
+    .truck-report .bills { gap: 8px; }
+    .truck-report .bill { padding: 8px 10px; }
+    .truck-report .bill-head { font-size: 11px; margin-bottom: 6px; }
+    .truck-report .bill-table td { padding: 3px 5px; font-size: 10px; }
+    .truck-report .bill-total { font-size: 11px; margin-top: 6px; padding-top: 4px; }
+    .truck-report .bill-grand { padding: 6px 10px; font-size: 11px; margin-top: 8px; }
+    .truck-report .bill-grand strong { font-size: 14px; }
+    .truck-report .billing-panel { margin-bottom: 8px !important; }
+    .truck-report table { font-size: 10px; margin-top: 8px; }
+    .truck-report thead th { padding: 5px 6px; font-size: 9px; }
+    .truck-report tbody td { padding: 4px 6px; font-size: 10px; }
+    .truck-report tbody td.cat { padding: 3px; font-size: 8px; }
+    .truck-report tfoot td { padding: 6px !important; font-size: 11px !important; }
+    .truck-report .payslip { padding: 10px 14px; margin-top: 8px; page-break-inside: avoid; box-shadow: none; }
+    .truck-report .payslip h2 { font-size: 12px; margin-bottom: 6px; }
+    .truck-report .payslip-grid { font-size: 11px; gap: 2px 10px; }
+    .truck-report .payslip-grid .total { font-size: 16px; margin-top: 4px; padding-top: 4px; }
+    .truck-report .fuel-panel { gap: 10px; grid-template-columns: 80px 1fr; }
+    .truck-report .tank-svg { max-height: 130px; }
+    .truck-report .tank-num { font-size: 16px; }
+    .truck-report .fuel-stat-row { padding: 2px 0; font-size: 11px; }
+    .truck-report .fuel-result { padding: 6px 10px; margin-top: 6px; }
+    .truck-report .fuel-result .result-num { font-size: 14px; }
+
     table { box-shadow: none !important; border: 1px solid #ddd !important; }
-    .payslip { page-break-inside: avoid; }
+    .payslip { page-break-inside: avoid; box-shadow: none !important; }
   }
 </style>
 </head>
@@ -1276,6 +1319,11 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras) 
   const profitSign = profit >= 0 ? '+' : '';
 
   return `
+    <div class="report-actions">
+      <button class="btn-print" onclick="printTruckReport()">🖨️ ออกรีพอร์ต / พิมพ์</button>
+    </div>
+
+    <div class="truck-report" id="truck-report">
     <div class="header">
       <div>
         <h1>🚛 ${esc(truck.plate)}</h1>
@@ -1285,10 +1333,6 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras) 
         <div class="period">${THAI_MONTHS[p.month]} ${p.year + 543} รอบ ${p.month}.${p.half}</div>
         <div class="period-sub">${p.halfLabel}</div>
       </div>
-    </div>
-
-    <div class="report-actions">
-      <button class="btn-print" onclick="window.print()">🖨️ ออกรีพอร์ต / พิมพ์</button>
     </div>
 
     <div class="panels">
@@ -1489,6 +1533,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras) 
       </div>
       ${matchMsg}
     </div>
+    </div><!-- /truck-report -->
   `;
 }
 
@@ -2342,6 +2387,53 @@ function selectTruck(plate) {
   currentPlate = plate;
   reload();
 }
+
+/**
+ * พิมพ์รายงานรถ 1 คัน → fit ใน A4 portrait หน้าเดียว
+ *
+ * วิธี: ก่อนเรียก window.print() — วัดความสูง .truck-report
+ * เทียบกับขนาด A4 portrait content area (190mm × 277mm)
+ * → ถ้าเกิน → apply transform: scale(s) ให้พอดี
+ * → หลังพิมพ์ → reset
+ */
+function printTruckReport() {
+  const report = document.getElementById('truck-report');
+  if (!report) { window.print(); return; }
+
+  // A4 portrait content area @ 96dpi (margin 10mm): 190×277mm ≈ 718×1047px
+  const A4_W_PX = 190 * 3.7795275591;   // mm → px @ 96dpi
+  const A4_H_PX = 277 * 3.7795275591;
+
+  // ล้าง scale เดิม (กัน double-scale)
+  report.style.transform = '';
+  report.style.width = '';
+
+  // วัดสด — รอ layout settle
+  requestAnimationFrame(() => {
+    const w = report.scrollWidth;
+    const h = report.scrollHeight;
+    const sW = A4_W_PX / w;
+    const sH = A4_H_PX / h;
+    const scale = Math.min(sW, sH, 1);  // ไม่ขยายเกิน 100%
+
+    if (scale < 1) {
+      report.style.transform = `scale(${scale})`;
+      report.style.transformOrigin = 'top left';
+      // ขยาย width ของ wrapper เพื่อให้ scaled-down content เต็มหน้า
+      report.style.width = `${100 / scale}%`;
+    }
+
+    setTimeout(() => {
+      window.print();
+      // reset หลังพิมพ์เสร็จ (รอ dialog ปิด)
+      setTimeout(() => {
+        report.style.transform = '';
+        report.style.width = '';
+      }, 1000);
+    }, 100);
+  });
+}
+window.printTruckReport = printTruckReport;
 
 function changePeriod(delta) {
   try {
