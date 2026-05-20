@@ -82,7 +82,8 @@
   table.main thead th.num { text-align: right; }
   table.main tbody td { padding: 5px 7px; border-top: 1px solid #eee; vertical-align: top; font-variant-numeric: tabular-nums; }
   table.main tbody td.num { text-align: right; }
-  table.main tbody td.cat { font-weight: 600; font-size: 10px; writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px; width: 22px; }
+  /* Category cell — horizontal text (vertical writing-mode renders broken in html2canvas/PDF) */
+  table.main tbody td.cat { font-weight: 600; font-size: 9px; padding: 6px 4px; width: 56px; text-align: center; white-space: nowrap; vertical-align: middle; letter-spacing: -0.02em; }
   .row-trip td { background: #fce4ec; } .row-trip td.cat { background: #f8bbd0; }
   .row-extra td { background: #fef9c3; } .row-extra td.cat { background: #fde047; }
   .row-fuel td { background: #ffe0b2; } .row-fuel td.cat { background: #ffcc80; }
