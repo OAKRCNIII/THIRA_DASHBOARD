@@ -100,18 +100,21 @@
 
   @media print {
     body { background: white; padding: 0; }
-    .toolbar { display: none; }
+    .toolbar, .ipad-tip { display: none; }
     .container { padding: 0; max-width: none; }
+    /* keep fixed landscape dimensions in print → กัน iPad render content เล็กผิด */
     .page {
       box-shadow: none;
       margin: 0;
       padding: 0;
       border-radius: 0;
-      width: 100%;
-      min-height: auto;
-      max-height: none;
-      overflow: visible;
+      width: 277mm;
+      min-height: 190mm;
+      max-height: 190mm;
+      overflow: hidden;
+      page-break-after: always;
     }
+    .page:last-child { page-break-after: auto; }
     .summary-header { border-radius: 0; margin: 0 0 10px 0; padding: 12px 16px; }
     .summary-header h1 { font-size: 20px; }
     .truck-header { border-radius: 0; margin: 0 0 8px 0; padding: 10px 14px; }
@@ -128,6 +131,17 @@
   <a class="btn-back" href="dashboard.html">← กลับ Dashboard</a>
 </div>
 
+<!-- iPad / iOS tip — แสดงเฉพาะบน iPad (JS detect ด้านล่าง) -->
+<div id="ipad-tip" class="ipad-tip" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 16px;margin:0 20px 12px;border-radius:8px;font-size:14px;line-height:1.6;max-width:1100px;margin-left:auto;margin-right:auto;">
+  📱 <strong>กำลังใช้ iPad?</strong> ตอนกดพิมพ์ ให้ทำตามนี้:
+  <ol style="margin:6px 0 0;padding-left:24px">
+    <li>กดปุ่ม <strong>🖨️ พิมพ์</strong> ด้านบน</li>
+    <li>เลือก <strong>ขนาด</strong> = <code>A4</code></li>
+    <li>เลือก <strong>การวางแนว</strong> = <code>แนวนอน</code> (Landscape) ⬅</li>
+    <li>ในส่วน <strong>ตัวเลือก</strong> ติ๊ก <code>กราฟิกพื้นหลัง</code> เพื่อให้สีติด</li>
+  </ol>
+</div>
+
 <div class="container" id="report">กำลังโหลด...</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -140,6 +154,17 @@ const BILL1 = ['OGM', 'KNT'];
 
 const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });
 const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'ants' } });
+
+// iPad/iOS detect — แสดง tip การพิมพ์
+(function detectIPad() {
+  const ua = navigator.userAgent;
+  const isIPad = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const isIOS  = /iPhone|iPod/.test(ua);
+  if (isIPad || isIOS) {
+    const tip = document.getElementById('ipad-tip');
+    if (tip) tip.style.display = 'block';
+  }
+})();
 
 const fmtBaht = (n, dflt='—') => (n == null || n === 0) ? dflt : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fmtLiter = (n, dflt='—') => (n == null || n === 0) ? dflt : Math.round(Number(n)).toLocaleString('en-US');
