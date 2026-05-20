@@ -18,6 +18,9 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const LINE_CHANNEL_ACCESS_TOKEN = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// LIFF app ID สำหรับฟอร์มแก้ไขบิล — set หลังสร้างใน LINE Developers Console
+// ถ้ายังไม่ตั้ง → ปุ่มแก้ไขจะ fallback ไปแบบเก่า (พิมพ์ใน chat)
+const LIFF_ID_EDIT_BILL = Deno.env.get("LIFF_ID_EDIT_BILL") || "";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -719,9 +722,15 @@ function buildConfirmFlex(pending: any): any {
           { type: "button", style: "primary", color: "#10b981", action: { type: "postback", label: "✓ ยืนยัน",
             data: `action=bill_confirm&id=${pending.id}` }}
         ]},
-        { type: "button", style: "secondary", height: "sm",
-          action: { type: "postback", label: "✏️ แก้ไขตัวเลข",
-            data: `action=bill_edit&id=${pending.id}` }}
+        // ปุ่ม "✏️ แก้ไข" → เปิด LIFF form ถ้ามี LIFF_ID set ไว้
+        // ไม่งั้น fallback ไป postback (พิมพ์แก้ใน chat แบบเดิม)
+        LIFF_ID_EDIT_BILL
+          ? { type: "button", style: "secondary", height: "sm",
+              action: { type: "uri", label: "✏️ แก้ไขในฟอร์ม",
+                uri: `https://liff.line.me/${LIFF_ID_EDIT_BILL}?id=${pending.id}&t=${pending.edit_token}` } }
+          : { type: "button", style: "secondary", height: "sm",
+              action: { type: "postback", label: "✏️ แก้ไขตัวเลข",
+                data: `action=bill_edit&id=${pending.id}` } }
       ]}
     }
   };

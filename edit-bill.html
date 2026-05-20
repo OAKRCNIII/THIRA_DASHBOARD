@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>แก้ไขบิล — THIRA</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --bg-deep: #f4f4f5;
+    --border: #e4e4e7;
+    --text-1: #09090b;
+    --text-2: #3f3f46;
+    --text-3: #71717a;
+    --text-4: #a1a1aa;
+    --accent: #06c755;          /* LINE green */
+    --accent-hover: #05b34a;
+    --accent-soft: #e9f9ef;
+    --danger: #ef4444;
+    --r-1: 8px;
+    --r-2: 12px;
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: 'Sarabun', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text-1);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  }
+  .num { font-family: 'Inter', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+
+  .app { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  .hero {
+    background: linear-gradient(135deg, #06c755 0%, #00b248 100%);
+    color: white;
+    padding: 18px 20px;
+    border-radius: var(--r-2);
+    margin-bottom: 14px;
+    box-shadow: 0 4px 14px rgba(6,199,85,0.25);
+  }
+  .hero h1 { font-size: 18px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .hero .sub { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-2);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-3);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-1);
+    font-family: inherit;
+    font-size: 16px; /* 16px = no zoom on iOS */
+    background: var(--surface);
+    color: var(--text-1);
+    transition: all 120ms var(--ease);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(6,199,85,0.15);
+  }
+  .field.num input { font-family: 'Inter', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .field .hint { font-size: 11px; color: var(--text-4); margin-top: 4px; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    position: sticky;
+    bottom: 16px;
+    background: var(--bg);
+    padding: 8px 0;
+  }
+  .actions button {
+    flex: 1;
+    padding: 14px;
+    border: 0;
+    border-radius: var(--r-2);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 120ms var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .actions button:active { transform: scale(0.97); }
+  .btn-cancel { background: var(--bg-deep); color: var(--text-2); }
+  .btn-submit { background: var(--accent); color: white; box-shadow: 0 4px 14px rgba(6,199,85,0.25); }
+  .btn-submit:hover { background: var(--accent-hover); }
+  .btn-submit:disabled { background: var(--text-4); cursor: not-allowed; box-shadow: none; }
+
+  .ocr-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent-soft);
+    color: #065f46;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin-left: 6px;
+  }
+
+  .msg-box {
+    padding: 12px 14px;
+    border-radius: var(--r-1);
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .msg-box.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+  .msg-box.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; display: block; }
+  .msg-box.loading { background: var(--bg-deep); color: var(--text-2); display: block; text-align: center; }
+
+  .loader {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--bg-deep);
+    border-top: 2px solid var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="hero">
+    <h1>✏️ แก้ไขบิล</h1>
+    <div class="sub" id="hero-sub">กำลังโหลดข้อมูล...</div>
+  </div>
+
+  <div id="loading-msg" class="msg-box loading">
+    <span class="loader"></span> กำลังโหลด...
+  </div>
+
+  <div id="error-msg" class="msg-box error"></div>
+
+  <form id="bill-form" style="display:none">
+    <div class="card">
+
+      <div class="field">
+        <label>วันที่</label>
+        <input type="date" id="f-date" required>
+      </div>
+
+      <div class="field">
+        <label>ทะเบียนรถ</label>
+        <select id="f-plate" required>
+          <option value="71-9538">71-9538 — นายหัวเลย่</option>
+          <option value="72-1620">72-1620 — นายหัวปอ</option>
+          <option value="72-2237">72-2237 — นายหัวประเสริฐ</option>
+          <option value="72-2420">72-2420 — นายหัวบังเฮง</option>
+          <option value="72-2953">72-2953 — นายหัวบังฟี</option>
+          <option value="72-3148">72-3148 — นายหัวอาคม</option>
+          <option value="XX-XXXX">🌐 รวมฝูง (XX-XXXX)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>หมวด</label>
+        <select id="f-category" required>
+          <option value="ค่าน้ำมัน">⛽ ค่าน้ำมัน</option>
+          <option value="ค่ายาง">🛞 ค่ายาง</option>
+          <option value="เช็คระยะ">🔧 เช็คระยะ</option>
+          <option value="ค่าผ่านด่าน">🛣️ ค่าผ่านด่าน</option>
+          <option value="ค่าเคลียจ่าแชมป์">💰 ค่าเคลียจ่าแชมป์</option>
+          <option value="ค่าเคลียหมวดกร">💰 ค่าเคลียหมวดกร</option>
+          <option value="ประกัน">🛡 ประกัน</option>
+          <option value="บัญชี">📊 บัญชี</option>
+          <option value="ร้อยละ4">💼 ร้อยละ4</option>
+          <option value="สุวิทย์">👤 สุวิทย์</option>
+          <option value="บุญช่วย">👤 บุญช่วย</option>
+          <option value="อื่นๆ">📌 อื่นๆ</option>
+        </select>
+      </div>
+
+      <div class="field-row" id="fuel-row" style="display:none">
+        <div class="field num">
+          <label>ลิตร</label>
+          <input type="number" id="f-liters" step="0.1" min="0" inputmode="decimal" placeholder="0.0">
+        </div>
+        <div class="field num">
+          <label>ราคา/ลิตร</label>
+          <input type="number" id="f-rate" step="0.01" min="0" inputmode="decimal" placeholder="41.81">
+        </div>
+      </div>
+
+      <div class="field num">
+        <label>ยอดเงิน (บาท)</label>
+        <input type="number" id="f-amount" step="0.01" min="0" inputmode="decimal" required>
+        <div class="hint" id="amount-hint"></div>
+      </div>
+
+      <div class="field">
+        <label>หมายเหตุ</label>
+        <input type="text" id="f-note" placeholder="เช่น เติมที่ วนิดาพานิช" maxlength="200">
+      </div>
+
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="btn-cancel">ปิด</button>
+      <button type="submit" class="btn-submit" id="btn-submit">
+        ส่งเพื่อยืนยันใน LINE →
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- LINE LIFF SDK -->
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// CONFIG (ใส่ LIFF_ID หลังสร้าง LIFF app)
+// ─────────────────────────────────────────────────────────────────
+const LIFF_ID = '__LIFF_ID_HERE__';   // จะแทนหลังสร้าง LIFF app
+const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
+// Endpoint ของ edge function ที่รับการ submit form
+const EDIT_ENDPOINT = 'https://ywslgrusflfuxtrtvlfu.supabase.co/functions/v1/line-edit-bill';
+
+const $ = id => document.getElementById(id);
+const showError = msg => { $('error-msg').textContent = '❌ ' + msg; $('error-msg').style.display = 'block'; $('loading-msg').style.display = 'none'; };
+const params = new URLSearchParams(location.search);
+const PENDING_ID = params.get('id');
+const TOKEN = params.get('t');
+
+// Pre-fill จาก data ที่ดึงมา
+let originalData = {};
+
+async function init() {
+  if (!PENDING_ID || !TOKEN) {
+    showError('ลิงก์ไม่ถูกต้อง — กลับไปกด "✏️ แก้ไข" ใน LINE ใหม่');
+    return;
+  }
+
+  // 1. LIFF init (สำหรับปุ่ม close)
+  try {
+    if (LIFF_ID !== '__LIFF_ID_HERE__') {
+      await liff.init({ liffId: LIFF_ID });
+    }
+  } catch (e) {
+    console.warn('LIFF init failed:', e);
+  }
+
+  // 2. ดึงข้อมูลปัจจุบันจาก Supabase (RPC fetch_pending_for_edit)
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fetch_pending_for_edit`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept-Profile': 'thira'
+      },
+      body: JSON.stringify({ p_id: Number(PENDING_ID), p_token: TOKEN })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    if (!rows || rows.length === 0) {
+      showError('ไม่พบบิลนี้ หรือลิงก์หมดอายุ (เกิน 24 ชม.) หรือสถานะไม่ถูกต้อง');
+      return;
+    }
+    originalData = rows[0];
+    fillForm(originalData);
+    $('loading-msg').style.display = 'none';
+    $('bill-form').style.display = 'block';
+    $('hero-sub').textContent = `บิล #${PENDING_ID} • แก้ไขแล้วกดส่ง → จะมีให้ยืนยันใน LINE อีกครั้ง`;
+  } catch (e) {
+    showError('โหลดข้อมูลไม่สำเร็จ: ' + e.message);
+  }
+}
+
+function fillForm(d) {
+  $('f-date').value = d.date || new Date().toISOString().slice(0,10);
+  $('f-plate').value = d.truck_plate || 'XX-XXXX';
+  $('f-category').value = d.category || 'อื่นๆ';
+  $('f-liters').value = d.liters || '';
+  $('f-amount').value = d.amount || '';
+  $('f-note').value = d.note || '';
+  toggleFuelFields();
+  updateAmountHint();
+}
+
+function toggleFuelFields() {
+  const cat = $('f-category').value;
+  $('fuel-row').style.display = (cat === 'ค่าน้ำมัน') ? 'grid' : 'none';
+}
+
+function updateAmountHint() {
+  const liters = parseFloat($('f-liters').value);
+  const rate = parseFloat($('f-rate').value);
+  if (liters > 0 && rate > 0) {
+    const auto = liters * rate;
+    $('amount-hint').textContent = `🔢 ${liters} × ${rate} = ${auto.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})} บ.`;
+    if (!$('f-amount').value || Math.abs(Number($('f-amount').value) - auto) > 1) {
+      $('f-amount').value = auto.toFixed(2);
+    }
+  } else { $('amount-hint').textContent = ''; }
+}
+
+// Event listeners
+$('f-category').addEventListener('change', toggleFuelFields);
+$('f-liters').addEventListener('input', updateAmountHint);
+$('f-rate').addEventListener('input', updateAmountHint);
+
+$('btn-cancel').addEventListener('click', () => {
+  if (liff && liff.isInClient && liff.isInClient()) {
+    liff.closeWindow();
+  } else {
+    window.close();
+  }
+});
+
+$('bill-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '⏳ กำลังส่ง...';
+  $('error-msg').style.display = 'none';
+
+  const payload = {
+    pending_id: Number(PENDING_ID),
+    token: TOKEN,
+    date: $('f-date').value,
+    truck_plate: $('f-plate').value,
+    category: $('f-category').value,
+    liters: $('f-liters').value ? Number($('f-liters').value) : null,
+    amount: Number($('f-amount').value),
+    note: $('f-note').value.trim() || null
+  };
+
+  try {
+    const res = await fetch(EDIT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (!res.ok || result.error) throw new Error(result.error || `HTTP ${res.status}`);
+
+    // success — close LIFF (LINE bot จะส่ง Flex confirm ใหม่)
+    btn.textContent = '✓ ส่งแล้ว — กลับไปดูใน LINE';
+    setTimeout(() => {
+      if (liff && liff.isInClient && liff.isInClient()) {
+        liff.closeWindow();
+      } else {
+        document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:Sarabun"><h2>✅ ส่งแล้ว</h2><p>กลับไปดูข้อความใน LINE เพื่อกดยืนยัน</p></div>';
+      }
+    }, 800);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'ส่งเพื่อยืนยันใน LINE →';
+    showError('ส่งไม่สำเร็จ: ' + err.message);
+  }
+});
+
+init();
+</script>
+</body>
+</html>
