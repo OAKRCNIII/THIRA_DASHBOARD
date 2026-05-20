@@ -367,7 +367,6 @@ function renderTruckPage(truck, p, data, pay) {
       <div class="truck-header">
         <div>
           <h2>🚛 ${esc(truck.plate)} — ${esc(truck.driver_name)}</h2>
-          <div class="sub">ใช้ลิตรชุดที่ ${truck.fuel_route} • เงินเดือน ${fmtBaht(pay.baseSal)}/เดือน</div>
         </div>
         <div style="text-align:right">
           <div class="period">${THAI_MONTHS[p.month]} ${p.year + 543} ${p.month}.${p.half}</div>
