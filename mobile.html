@@ -300,11 +300,46 @@
     padding: 16px; font-size: 13px;
   }
 
-  /* ── Small phones ── */
+  /* ── Small phones (Galaxy Z Fold 6 outer screen ~968px wide ตอน fold) ── */
   @media (max-width: 360px) {
     .tc-plate { font-size: 16px; }
     .tc-profit { font-size: 17px; }
     .top-row h1 { font-size: 16px; }
+  }
+
+  /* ───────────────────────────────────────────────────────────
+     Galaxy Z Fold 6 — Unfolded (inner screen) — tablet layout
+     7.6" 2160×1856 (~1.16:1 aspect)
+     ใช้ 2-column grid + bigger cards + sidebar tabs
+     ───────────────────────────────────────────────────────────  */
+  @media (min-width: 720px) {
+    body { font-size: 16px; }
+    .top { padding: calc(env(safe-area-inset-top) + 12px) 24px 16px; }
+    .top-row h1 { font-size: 20px; }
+
+    /* รถ cards = 2 columns บนหน้า unfolded */
+    .truck-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 24px; }
+    /* KPI cards ใหญ่ขึ้น */
+    .kpi-row { padding: 16px 24px; gap: 12px; }
+    .kpi-row .kpi { padding: 16px 18px; }
+    .kpi-row .kpi .v { font-size: 22px; }
+
+    /* Bottom nav กว้างขึ้น ปรับ padding */
+    .bottom-nav { padding: 12px env(safe-area-inset-left) calc(env(safe-area-inset-bottom) + 12px); }
+
+    /* Modal กว้างจำกัด — กลางจอ */
+    .detail-modal { max-width: 720px; margin: 0 auto; border-radius: 24px 24px 0 0; }
+  }
+
+  /* Wider unfolded (landscape unfolded ~2160px) — 3-column grid */
+  @media (min-width: 1100px) {
+    .truck-cards { grid-template-columns: 1fr 1fr 1fr; }
+    .kpi-row { grid-template-columns: repeat(5, 1fr); }
+  }
+
+  /* Foldable hinge spanning support (Android dual-screen) */
+  @media (spanning: single-fold-vertical) {
+    .truck-cards { grid-template-columns: 1fr 1fr; }
   }
 </style>
 </head>
@@ -313,6 +348,7 @@
   <div class="top-row">
     <h1>🚛 THIRA Dashboard</h1>
     <div class="actions">
+      <button class="icon-btn" id="install-btn" onclick="installApp()" title="ติดตั้งเป็นแอป" style="display:none">⬇</button>
       <button class="icon-btn" onclick="setAntsKey()" title="ตั้ง ANTS key">🔑</button>
       <button class="icon-btn" onclick="reload()" title="โหลดใหม่">🔄</button>
     </div>
@@ -703,6 +739,54 @@ document.getElementById('period-input').addEventListener('keydown', e => { if (e
 
 document.getElementById('period-input').value = getCurrent();
 reload();
+
+// ──────────────────────────────────────────────────────────
+// Service Worker — register ให้ PWA install ได้ + offline shell
+// ──────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed:', e));
+  });
+}
+
+// ──────────────────────────────────────────────────────────
+// PWA install — รับ event "beforeinstallprompt" จาก Android Chrome
+// → แสดงปุ่ม ⬇ ใน top bar ให้ user กดติดตั้ง
+// (iPhone Safari ไม่ trigger event นี้ — user ต้อง Share → Add to Home Screen เอง)
+// ──────────────────────────────────────────────────────────
+let __deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  __deferredPrompt = e;
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'inline-flex';
+});
+
+window.installApp = async function() {
+  if (!__deferredPrompt) {
+    // iPhone fallback
+    const ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/.test(ua)) {
+      alert('🍎 บน iPhone/iPad:\n\n1. กดปุ่ม Share (รูปสี่เหลี่ยมลูกศรขึ้น) ในแถบเครื่องมือ\n2. เลื่อนหา "Add to Home Screen" / "เพิ่มที่หน้าจอหลัก"\n3. กด Add → ไอคอน THIRA จะปรากฏที่หน้าจอหลัก');
+    } else {
+      alert('แอปติดตั้งไว้แล้ว หรือเบราว์เซอร์ไม่รองรับ — ลองเปิดผ่าน Chrome หรือ Samsung Internet');
+    }
+    return;
+  }
+  __deferredPrompt.prompt();
+  const { outcome } = await __deferredPrompt.userChoice;
+  console.log('Install outcome:', outcome);
+  __deferredPrompt = null;
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'none';
+};
+
+// ซ่อนปุ่มถ้าติดตั้งแล้ว
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'none';
+});
 </script>
 </body>
 </html>

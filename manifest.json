@@ -1,17 +1,48 @@
 {
   "name": "THIRA Dashboard",
   "short_name": "THIRA",
-  "description": "ระบบติดตามรถหัวลาก THIRA RT LOGISTIC",
+  "description": "ระบบติดตามรถหัวลาก THIRA RT LOGISTIC — รายเที่ยว/รายเดือน/บิล",
+  "id": "/THIRA_DASHBOARD/",
   "start_url": "./mobile.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#1e3a5f",
   "theme_color": "#1e3a5f",
-  "orientation": "portrait",
+  "orientation": "any",
+  "categories": ["business", "productivity", "finance"],
+  "lang": "th",
+  "dir": "ltr",
   "icons": [
+    { "src": "icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "ภาพรวมฝูง",
+      "short_name": "ฝูง",
+      "description": "ดูสรุปทั้ง 6 คัน",
+      "url": "./dashboard.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "กำไรรายเดือน",
+      "short_name": "รายเดือน",
+      "description": "รายงานกำไรรายเดือนทั้งปี",
+      "url": "./monthly.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "ออกรีพอร์ต",
+      "short_name": "รีพอร์ต",
+      "description": "พิมพ์รีพอร์ตทั้งฝูง",
+      "url": "./print_all.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
 }
