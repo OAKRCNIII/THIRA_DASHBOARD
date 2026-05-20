@@ -12,50 +12,51 @@
 <script src="auth.js"></script>
 <style>
   /* ─────────────────────────────────────────────────────────
-     Design Tokens — Modern Light
+     Design Tokens — Minimal (Linear / Notion inspired)
      ───────────────────────────────────────────────────── */
   :root {
-    /* Neutral palette */
-    --bg: #fafafa;
-    --bg-deep: #f4f4f5;
+    /* Backgrounds — clean whites with minimal contrast */
+    --bg: #ffffff;
+    --bg-deep: #f7f7f8;
     --surface: #ffffff;
-    --surface-hover: #f8f8f8;
-    --border: #e4e4e7;
+    --surface-hover: #fafafa;
+    --border: #ececee;
     --border-strong: #d4d4d8;
-    --text-1: #09090b;
-    --text-2: #3f3f46;
-    --text-3: #71717a;
-    --text-4: #a1a1aa;
-    /* Brand: indigo */
-    --accent: #4f46e5;
-    --accent-hover: #4338ca;
-    --accent-soft: #eef2ff;
-    --accent-text: #312e81;
-    /* Semantic */
-    --success: #10b981;
-    --success-soft: #ecfdf5;
-    --success-text: #065f46;
-    --warning: #f59e0b;
+    /* Text — high contrast for readability */
+    --text-1: #0a0a0a;
+    --text-2: #404040;
+    --text-3: #737373;
+    --text-4: #a3a3a3;
+    /* Accent: near-black (monochrome) — minimal vibe */
+    --accent: #18181b;
+    --accent-hover: #27272a;
+    --accent-soft: #f4f4f5;
+    --accent-text: #18181b;
+    /* Semantic — desaturated, used sparingly */
+    --success: #16a34a;
+    --success-soft: #f0fdf4;
+    --success-text: #14532d;
+    --warning: #d97706;
     --warning-soft: #fffbeb;
-    --warning-text: #92400e;
-    --danger: #ef4444;
+    --warning-text: #78350f;
+    --danger: #dc2626;
     --danger-soft: #fef2f2;
-    --danger-text: #991b1b;
-    --info: #0ea5e9;
+    --danger-text: #7f1d1d;
+    --info: #0284c7;
     --info-soft: #f0f9ff;
-    /* Radii */
+    /* Radii — slightly smaller for tighter feel */
     --r-1: 6px;
-    --r-2: 10px;
-    --r-3: 14px;
-    --r-4: 20px;
-    /* Shadows */
-    --shadow-1: 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-2: 0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
-    --shadow-3: 0 12px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
+    --r-2: 8px;
+    --r-3: 12px;
+    --r-4: 16px;
+    /* Shadows — very subtle, single layer */
+    --shadow-1: 0 1px 0 rgba(0,0,0,0.04);
+    --shadow-2: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-3: 0 8px 24px rgba(0,0,0,0.08);
     /* Motion */
     --ease: cubic-bezier(0.32, 0.72, 0, 1);
-    --t-fast: 120ms;
-    --t-base: 180ms;
+    --t-fast: 100ms;
+    --t-base: 160ms;
     /* Type */
     --font-display: 'Inter', 'Sarabun', system-ui, sans-serif;
     --font-mono: 'Inter', 'SF Mono', ui-monospace, monospace;
@@ -79,12 +80,10 @@
   .num, .value, td.num, .picker input { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
   /* ─────────────────────────────────────────────────────────
-     Top bar — sticky, slim, glass-like
+     Top bar — minimal flat card
      ───────────────────────────────────────────────────── */
   .toolbar {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: saturate(180%) blur(12px);
-    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    background: var(--surface);
     padding: 12px 16px;
     border-radius: var(--r-3);
     margin-bottom: 14px;
@@ -93,28 +92,29 @@
     align-items: center;
     flex-wrap: wrap;
     border: 1px solid var(--border);
-    box-shadow: var(--shadow-1);
     position: sticky;
     top: 8px;
     z-index: 100;
   }
   .toolbar h1 {
-    font-size: 18px;
+    font-size: 17px;
     color: var(--text-1);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     margin-right: auto;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
   .toolbar h1 .logo-emoji {
     display: inline-grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: var(--r-2);
-    background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
-    font-size: 16px;
-    box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+    background: var(--accent);
+    color: white;
+    font-size: 15px;
   }
   .picker {
     display: flex;
@@ -168,15 +168,14 @@
   .nav-row .nav-label {
     font-size: 11px;
     color: var(--text-4);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-    padding: 0 4px;
+    font-weight: 400;
+    padding: 0 6px 0 2px;
+    min-width: 30px;
   }
 
-  /* Section tab — large pill */
+  /* Section tab — minimal pill */
   .tab {
-    padding: 10px 16px;
+    padding: 8px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-2);
@@ -185,7 +184,6 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--text-2);
-    box-shadow: var(--shadow-1);
     transition: all var(--t-fast) var(--ease);
     display: inline-flex;
     align-items: center;
@@ -193,37 +191,34 @@
     line-height: 1.2;
     text-decoration: none;
   }
-  .tab .plate { font-size: 13px; font-weight: 600; color: var(--text-1); }
+  .tab .plate { font-size: 13px; font-weight: 500; color: var(--text-1); }
   .tab .driver { font-size: 11px; color: var(--text-3); font-weight: 400; margin-left: 2px; }
-  .tab:hover { background: var(--surface-hover); border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-2); }
+  .tab:hover { background: var(--surface-hover); border-color: var(--border-strong); color: var(--text-1); }
   .tab.active {
-    background: var(--accent-soft);
+    background: var(--accent);
     border-color: var(--accent);
-    color: var(--accent-text);
-    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+    color: white;
   }
-  .tab.active .plate { color: var(--accent-text); }
+  .tab.active .plate, .tab.active .driver { color: white; }
+  .tab.active .driver { opacity: 0.7; }
 
-  /* Section-specific accents (subtle, only when active) */
-  .tab.tab-overview.active { background: var(--info-soft); border-color: var(--info); color: #075985; box-shadow: 0 0 0 3px rgba(14,165,233,0.12); }
-  .tab.tab-input.active { background: var(--warning-soft); border-color: var(--warning); color: var(--warning-text); box-shadow: 0 0 0 3px rgba(245,158,11,0.12); }
-  .tab.tab-income.active { background: var(--success-soft); border-color: var(--success); color: var(--success-text); box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+  /* Section-specific tabs — neutral, just darker on active (no colored backgrounds) */
+  .tab.tab-overview.active,
+  .tab.tab-input.active,
+  .tab.tab-income.active { background: var(--accent); border-color: var(--accent); color: white; }
   .tab.tab-monthly { background: var(--surface); }
-  .tab.tab-monthly:hover { color: #7c3aed; border-color: #c4b5fd; }
 
   /* Truck pill — compact */
   .tab.tab-truck {
-    padding: 8px 14px;
+    padding: 6px 12px;
     min-width: 0;
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
   }
-  .tab.tab-truck .plate { font-family: var(--font-mono); font-weight: 700; letter-spacing: -0.01em; }
+  .tab.tab-truck .plate { font-family: var(--font-mono); font-weight: 600; letter-spacing: -0.01em; }
   .tab.tab-truck .driver { margin-left: 0; }
-  .tab.tab-truck.active { background: var(--text-1); border-color: var(--text-1); color: white; box-shadow: 0 4px 14px rgba(9,9,11,0.25); }
-  .tab.tab-truck.active .plate, .tab.tab-truck.active .driver { color: white; }
-  .tab.tab-truck.active .driver { opacity: 0.7; }
+  .tab.tab-truck.active { background: var(--accent); border-color: var(--accent); }
 
   /* ── Status pills ── */
   .status { padding: 10px 14px; background: var(--warning-soft); color: var(--warning-text); border-radius: var(--r-2); margin-bottom: 12px; border: 1px solid #fde68a; font-size: 13px; }
@@ -234,7 +229,7 @@
   .error { padding: 10px 16px; background: #f8d7da; color: #721c24; border-radius: 6px; margin-bottom: 12px; }
 
   /* ─────────────────────────────────────────────────────────
-     Hero header — Modern card with subtle gradient
+     Hero header — Minimal flat
      ───────────────────────────────────────────────────── */
   .header {
     background: var(--surface);
@@ -242,42 +237,30 @@
     padding: 20px 24px;
     border-radius: var(--r-3);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow-1);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 16px;
-    position: relative;
-    overflow: hidden;
-  }
-  .header::before {
-    content: '';
-    position: absolute;
-    top: -60px;
-    right: -60px;
-    width: 240px;
-    height: 240px;
-    background: radial-gradient(circle, rgba(79,70,229,0.08) 0%, transparent 70%);
-    pointer-events: none;
   }
   .header h1 {
-    font-size: 24px;
+    font-size: 22px;
     color: var(--text-1);
     letter-spacing: -0.02em;
     display: flex;
     align-items: center;
     gap: 10px;
+    font-weight: 600;
   }
-  .header h1 .h-emoji { font-size: 28px; }
-  .header .driver { font-size: 13px; color: var(--text-3); margin-top: 4px; font-weight: 500; }
-  .header-r { text-align: right; position: relative; z-index: 1; }
+  .header h1 .h-emoji { font-size: 24px; }
+  .header .driver { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+  .header-r { text-align: right; }
   .header-r .period {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--text-1);
     letter-spacing: -0.01em;
   }
-  .header-r .period-sub { color: var(--text-3); font-size: 12px; font-weight: 500; }
+  .header-r .period-sub { color: var(--text-3); font-size: 12px; }
 
   /* ─────────────────────────────────────────────────────────
      KPI cards — เด่น ตัวใหญ่ ใช้ Inter (เน้น "ตัวเลขสำคัญ")
@@ -288,58 +271,55 @@
     gap: 10px;
   }
   .kpi {
-    background: var(--bg-deep);
+    background: var(--surface);
     padding: 16px 18px;
     border-radius: var(--r-2);
-    border: 1px solid transparent;
-    position: relative;
-    transition: all var(--t-fast);
+    border: 1px solid var(--border);
+    transition: border-color var(--t-fast);
   }
-  .kpi:hover { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  .kpi:hover { border-color: var(--border-strong); }
   .kpi .label {
     font-size: 11px;
     color: var(--text-3);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 600;
+    font-weight: 500;
     margin-bottom: 8px;
+    letter-spacing: 0;
+    text-transform: none;
   }
   .kpi .value {
     font-family: var(--font-display);
-    font-size: 26px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 600;
     color: var(--text-1);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.025em;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }
-  .kpi .value .unit { font-size: 14px; font-weight: 500; color: var(--text-3); margin-left: 4px; }
+  .kpi .value .unit { font-size: 13px; font-weight: 400; color: var(--text-3); margin-left: 4px; }
+  /* Profit/loss: ONLY value color changes — no colored background */
   .kpi.profit-pos .value { color: var(--success); }
-  .kpi.profit-pos { background: var(--success-soft); }
   .kpi.profit-neg .value { color: var(--danger); }
-  .kpi.profit-neg { background: var(--danger-soft); }
 
-  /* ── Report panels ── */
+  /* ── Report panels — minimal */
   .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
   .panel {
     background: var(--surface);
     border-radius: var(--r-3);
-    padding: 16px 20px;
-    box-shadow: var(--shadow-1);
+    padding: 18px 20px;
     border: 1px solid var(--border);
   }
   .panel h3 {
     font-size: 13px;
     color: var(--text-2);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     padding-bottom: 10px;
     border-bottom: 1px solid var(--border);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
   }
-  .panel h3 small { text-transform: none; letter-spacing: 0; }
+  .panel h3 small { color: var(--text-4); }
 
   .ledger { font-size: 13px; }
   .ledger .line { display: flex; justify-content: space-between; padding: 4px 0; }
@@ -364,13 +344,13 @@
   }
   thead th {
     background: var(--bg-deep);
-    color: var(--text-2);
+    color: var(--text-3);
     padding: 10px 12px;
     font-size: 11px;
     text-align: left;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
     border-bottom: 1px solid var(--border);
   }
   thead th.num { text-align: right; }
@@ -388,12 +368,12 @@
   small.muted { color: var(--text-4); font-size: 11px; }
   tbody tr:hover td { background: rgba(0,0,0,0.015); }
 
-  /* Row category accents — softer pastels */
-  .row-trip td { background: #fdf2f8; } .row-trip td.cat { background: #fce7f3; color: #be185d; }
-  .row-extra td { background: #fefce8; } .row-extra td.cat { background: #fef3c7; color: #a16207; }
-  .row-fuel td { background: #fff7ed; } .row-fuel td.cat { background: #ffedd5; color: #c2410c; }
-  .row-other td { background: #f9fafb; } .row-other td.cat { background: #f3f4f6; color: var(--text-2); }
-  .row-paid td { background: var(--surface); } .row-paid td.cat { background: var(--bg-deep); color: var(--text-3); }
+  /* Row category — minimal: just colored category cell, neutral row bg */
+  .row-trip td { background: var(--surface); }   .row-trip td.cat   { background: var(--bg-deep); color: #db2777; box-shadow: inset 3px 0 0 #ec4899; }
+  .row-extra td { background: var(--surface); }  .row-extra td.cat  { background: var(--bg-deep); color: #ca8a04; box-shadow: inset 3px 0 0 #facc15; }
+  .row-fuel td { background: var(--surface); }   .row-fuel td.cat   { background: var(--bg-deep); color: #ea580c; box-shadow: inset 3px 0 0 #fb923c; }
+  .row-other td { background: var(--surface); }  .row-other td.cat  { background: var(--bg-deep); color: var(--text-2); box-shadow: inset 3px 0 0 #d4d4d8; }
+  .row-paid td { background: var(--surface); }   .row-paid td.cat   { background: var(--bg-deep); color: var(--text-3); box-shadow: inset 3px 0 0 #a3a3a3; }
 
   .del-btn {
     border: 0;
@@ -506,27 +486,26 @@
   }
   .batch-sum strong { color: var(--text-1); font-size: 16px; font-family: var(--font-display); font-feature-settings: 'tnum'; }
 
-  /* Payslip — highlight box */
+  /* Payslip — minimal flat card */
   .payslip {
-    background: linear-gradient(135deg, var(--surface) 0%, var(--accent-soft) 100%);
+    background: var(--surface);
     padding: 18px 24px;
     margin-top: 14px;
     border-radius: var(--r-3);
-    border: 1px solid var(--accent);
-    box-shadow: 0 0 0 4px rgba(79,70,229,0.08);
+    border: 1px solid var(--border);
   }
-  .payslip h2 { font-size: 14px; color: var(--accent-text); margin-bottom: 12px; font-weight: 600; }
-  .payslip-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; font-size: 14px; }
+  .payslip h2 { font-size: 13px; color: var(--text-3); margin-bottom: 14px; font-weight: 500; }
+  .payslip-grid { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 14px; }
   .payslip-grid .lbl { color: var(--text-2); }
-  .payslip-grid .val { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-display); }
+  .payslip-grid .val { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-display); color: var(--text-1); }
   .payslip-grid .total {
-    border-top: 2px solid var(--accent);
-    margin-top: 8px;
-    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+    padding-top: 12px;
     font-size: 22px;
-    font-weight: 700;
-    color: var(--accent-text);
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--text-1);
+    letter-spacing: -0.025em;
   }
   .warn-msg { color: var(--warning-text); font-weight: 600; margin-top: 6px; font-size: 13px; }
   .ok-msg { color: var(--success-text); font-weight: 600; margin-top: 6px; font-size: 13px; }
@@ -1192,7 +1171,7 @@ function renderOverview(p, allData) {
         <span style="color:#666;margin-left:8px">หน้าแรก = สรุปต้องโอนคนขับ + 6 หน้าถัดมา = รายคัน — พิมพ์/PDF</span>
       </div>
       <a href="print_all.html?period=${p.month}.${p.half}/${p.year}" target="_blank"
-        style="padding:8px 18px;background:#1e3a5f;color:white;border:0;border-radius:6px;cursor:pointer;font-weight:600;text-decoration:none">
+        style="padding:8px 18px;background:#18181b;color:white;border:0;border-radius:6px;cursor:pointer;font-weight:600;text-decoration:none">
         🖨️ ออกรีพอร์ต 6 คัน
       </a>
     </div>
@@ -1215,7 +1194,7 @@ function renderOverview(p, allData) {
         ${tableRows}
       </tbody>
       <tfoot>
-        <tr style="background:#1e3a5f;color:white;font-weight:700;">
+        <tr style="background:#18181b;color:white;font-weight:700;">
           <td style="padding:12px">รวมทั้งฝูง</td>
           <td class="num" style="padding:12px">${total.trips}${total.carryBillCnt > 0 ? `<br><small style="color:#fbbf24;font-weight:400">+${total.carryBillCnt} เก่า</small>` : ''}</td>
           <td class="num" style="padding:12px">
@@ -1624,7 +1603,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
         ${paidRows.join('')}
       </tbody>
       <tfoot>
-        <tr style="background:#1e3a5f;color:white;font-weight:700;">
+        <tr style="background:#18181b;color:white;font-weight:700;">
           <td colspan="3" style="padding:10px;">รวม ${esc(truck.driver_name)}</td>
           <td class="num" style="padding:10px;">${fmtLiter(tripTarget)} / ${fmtLiter(refillL)}</td>
           <td class="num" style="padding:10px;">${fmtBaht(refillB)}</td>
@@ -1860,7 +1839,7 @@ function renderMonthly(year, data) {
     <table class="monthly-table">
       <thead>
         <tr>
-          <th style="position:sticky;left:0;background:#1e3a5f;z-index:2">รถ / คนขับ</th>
+          <th style="position:sticky;left:0;background:#18181b;z-index:2">รถ / คนขับ</th>
           ${monthKeys.map(m => `<th class="num">${THAI_MONTHS[m]}</th>`).join('')}
           <th class="num" style="background:#0369a1">รวมปี</th>
         </tr>
@@ -1879,8 +1858,8 @@ function renderMonthly(year, data) {
         </tr>
       </tbody>
       <tfoot>
-        <tr style="background:#1e3a5f;color:white;font-weight:700">
-          <td style="position:sticky;left:0;background:#1e3a5f">🟢 กำไรสุทธิทั้งฝูง</td>
+        <tr style="background:#18181b;color:white;font-weight:700">
+          <td style="position:sticky;left:0;background:#18181b">🟢 กำไรสุทธิทั้งฝูง</td>
           ${netCells}
           <td class="num year-total"><strong style="color:${netYear>=0?'#a7f3d0':'#fca5a5'}">${netYear>=0?'+':''}${fmtBaht(netYear)}</strong></td>
         </tr>
