@@ -441,17 +441,13 @@ function renderTruckPage(truck, p, data, pay) {
           </div>
         </div>
 
-        <!-- ⛽ Fuel summary — เริ่มต้น + ยกไป -->
-        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12px;line-height:1.6;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="text-align:center;border-right:1px solid #fed7aa;padding-right:8px">
-            <div style="font-size:11px;color:#92400e;font-weight:500">เริ่มต้น</div>
-            <div style="font-size:18px;font-weight:700;color:#c2410c;font-variant-numeric:tabular-nums">${fmtLiter(pay.fuelOpen)} ล.</div>
-          </div>
-          <div style="text-align:center">
-            <div style="font-size:11px;color:#92400e;font-weight:500">ยกไป</div>
-            <div style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:${pay.fuelCarry > 0 ? '#c2410c' : '#16a34a'}">
-              ${pay.fuelCarry !== 0 ? (pay.fuelCarry > 0 ? '+' : '') + fmtLiter(Math.abs(pay.fuelCarry)) : '0'} ล.
-            </div>
+        <!-- ⛽ Fuel pill (มุมเล็กๆ) — เริ่มต้น = ค่าเดิม (ติดลบ = หนี้), ยกไป = ค้างปัจจุบัน -->
+        <div style="margin-top:8px;text-align:right">
+          <div style="display:inline-block;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:5px 10px;font-size:10px;line-height:1.5;color:#92400e;font-variant-numeric:tabular-nums">
+            ⛽ เริ่มต้น <strong style="color:#c2410c">${pay.fuelOpen !== 0 ? '−' : ''}${fmtLiter(pay.fuelOpen)} ล.</strong>
+            &nbsp;·&nbsp;
+            ยกไป <strong style="color:${pay.fuelCarry > 0 ? '#c2410c' : '#16a34a'}">${pay.fuelCarry !== 0 ? (pay.fuelCarry > 0 ? '−' : '+') : ''}${fmtLiter(Math.abs(pay.fuelCarry))} ล.</strong>
+            <small style="opacity:0.7">(ค้างตอนนี้)</small>
           </div>
         </div>
       </div>
