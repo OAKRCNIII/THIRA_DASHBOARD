@@ -1,6 +1,9 @@
 # Generated reports
 report_*.html
 
+# Sync watcher log
+sync/thira_watch.log
+
 # Environment / secrets
 .env
 .env.local
