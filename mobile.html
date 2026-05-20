@@ -429,22 +429,65 @@ function parsePeriod(s) {
   return {year, month, half, start: half===1?`${year}-${String(month).padStart(2,'0')}-01`:`${year}-${String(month).padStart(2,'0')}-16`, end: half===1?`${year}-${String(month).padStart(2,'0')}-15`:`${year}-${String(month).padStart(2,'0')}-${ld}`, halfLabel: half===1?`ครึ่งแรก`:`ครึ่งหลัง`};
 }
 
+const BILL1_PREFIXES = ['OGM', 'KNT'];
+
+function isBill1(trip) {
+  const inv = (trip.invoice_no || '').toUpperCase();
+  return BILL1_PREFIXES.some(p => inv.startsWith(p));
+}
+
+// Parse Thai date e.g. "อัพเดต 17 มีนาคม 2569" → "2026-03-17"
+function parseThaiDate(text) {
+  const m = String(text || '').match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+  if (!m) return null;
+  const day = +m[1];
+  const monthIdx = THAI_MONTHS_FULL.indexOf(m[2].trim());
+  if (monthIdx < 1) return null;
+  const year = +m[3] > 2500 ? +m[3] - 543 : +m[3];
+  return `${year}-${String(monthIdx).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+function findActivePriceSet(priceSets, dateISO) {
+  for (const ps of priceSets || []) {
+    if (ps.effective_date && ps.effective_date <= dateISO) return ps;
+  }
+  return null;
+}
+
+// Bill price จาก freight_price_sets (fallback ถ้า ANTS ไม่มี)
+function billPriceForTrip(trip) {
+  const code = trip.factory || (trip.invoice_no || '').slice(0, 3);
+  const factoryName = (cache.factoryMap && cache.factoryMap[code]) || code;
+  const ps = findActivePriceSet(cache.priceSets, trip.date_in);
+  if (!ps || !ps.prices) return { amount: 0, factoryName };
+  const amt = +(ps.prices[factoryName] || 0);
+  return { amount: amt, factoryName };
+}
+
 let cache = {};
 async function loadCache() {
   if (cache.trucks) return;
-  const [tRes, pRes, mRes] = await Promise.all([
+  // separate client for public schema (freight_price_sets)
+  const sbpub = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const [tRes, pRes, mRes, fRes] = await Promise.all([
     ths.from('trucks').select('*').neq('plate','XX-XXXX').order('plate'),
     ths.from('prices').select('*'),
-    ths.from('prefix_factory_map').select('*')
+    ths.from('prefix_factory_map').select('*'),
+    sbpub.from('freight_price_sets').select('id,name,prices,updated_at')
   ]);
   if (tRes.error) throw tRes.error;
   if (pRes.error) throw pRes.error;
   if (mRes.error) throw mRes.error;
+  if (fRes.error) throw fRes.error;
   cache.trucks = tRes.data;
   cache.priceMap = {};
   pRes.data.forEach(p => cache.priceMap[p.destination_code] = p);
   cache.factoryMap = {};
   mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
+  cache.priceSets = (fRes.data || [])
+    .map(ps => ({ ...ps, effective_date: parseThaiDate(ps.name) }))
+    .filter(ps => ps.effective_date)
+    .sort((a, b) => b.effective_date.localeCompare(a.effective_date));
 }
 
 function lookupPrice(factory, invoice) {
@@ -452,16 +495,23 @@ function lookupPrice(factory, invoice) {
 }
 
 async function fetchTruckData(plate, p) {
-  const [trips, outs, incs, extras, fp] = await Promise.all([
+  // Lookback 90 วันก่อน period start → หา trips ค้างจ่าย
+  const lookback = new Date(p.start);
+  lookback.setDate(lookback.getDate() - 90);
+  const carryStart = lookback.toISOString().slice(0, 10);
+
+  const [trips, outs, incs, extras, fp, carryRes] = await Promise.all([
     sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', p.start).lte('date_in', p.end).order('date_in'),
     ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date'),
     ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end),
     ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end),
-    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', p.year).eq('month', p.month).eq('half', p.half).maybeSingle()
+    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', p.year).eq('month', p.month).eq('half', p.half).maybeSingle(),
+    sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', carryStart).lt('date_in', p.start).order('date_in')
   ]);
+
   let billStatus = {};
   if (ants) {
-    const cntNos = trips.data.map(t => t.container_no).filter(Boolean);
+    const cntNos = [...trips.data, ...carryRes.data].map(t => t.container_no).filter(Boolean);
     if (cntNos.length > 0) {
       try {
         const r = await ants.from('transport_bills').select('container_no,bill_no,price,is_paid').in('container_no', cntNos);
@@ -469,26 +519,51 @@ async function fetchTruckData(plate, p) {
       } catch(e){}
     }
   }
-  return { trips: trips.data, outs: outs.data, incs: incs.data, extras: extras.data, fp: fp.data, billStatus };
+
+  // เหลือเฉพาะ carryover ที่ยังไม่มี bill_no = ค้างจ่าย
+  const carryUnpaid = carryRes.data.filter(t => {
+    const b = billStatus[t.container_no];
+    return !(b && b.bill_no);
+  });
+
+  return {
+    trips: trips.data, outs: outs.data, incs: incs.data,
+    extras: extras.data, fp: fp.data, billStatus, carryUnpaid
+  };
 }
 
 function compute(truck, p, d) {
   const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   let tripTarget = 0, tripFee = 0;
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0, bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
+
   for (const t of d.trips) {
     const pr = lookupPrice(t.factory, t.invoice_no);
     if (pr) { tripTarget += Number(pr[fuelCol]||0); tripFee += Number(pr.fee_driver||0); }
     const ab = d.billStatus[t.container_no];
     const isPaid = !!(ab && ab.bill_no);
-    const amt = ab && ab.price ? Number(ab.price) : 0;
-    const inv = (t.invoice_no||'').toUpperCase();
-    if (inv.startsWith('OGM') || inv.startsWith('KNT')) {
+    // ใช้ ANTS price ถ้ามี — ไม่งั้น fallback ไป freight_price_sets (เหมือน dashboard)
+    const fallback = billPriceForTrip(t);
+    const amt = (ab && ab.price) ? Number(ab.price) : fallback.amount;
+    if (isBill1(t)) {
       bill1 += amt; bill1Cnt++; if (isPaid) { bill1Paid += amt; bill1PaidCnt++; }
     } else {
       bill2 += amt; bill2Cnt++; if (isPaid) { bill2Paid += amt; bill2PaidCnt++; }
     }
   }
+
+  // Carryover (trips ค้างจ่ายจากรอบก่อน)
+  let carryBill1 = 0, carryBill2 = 0, carryBill1Cnt = 0, carryBill2Cnt = 0;
+  for (const t of (d.carryUnpaid || [])) {
+    const ab = d.billStatus[t.container_no];
+    const fallback = billPriceForTrip(t);
+    const amt = (ab && ab.price) ? Number(ab.price) : fallback.amount;
+    if (isBill1(t)) { carryBill1 += amt; carryBill1Cnt++; }
+    else            { carryBill2 += amt; carryBill2Cnt++; }
+  }
+  const carryBillTotal = carryBill1 + carryBill2;
+  const carryBillCnt = carryBill1Cnt + carryBill2Cnt;
+
   const refills = d.outs.filter(o => o.category === 'ค่าน้ำมัน');
   const refillL = refills.reduce((s,o) => s + Number(o.liters||0), 0);
   const refillB = refills.reduce((s,o) => s + Number(o.amount), 0);
@@ -504,10 +579,20 @@ function compute(truck, p, d) {
   const baseSal = Number(truck.monthly_salary||0);
   const salaryDue = p.half === 2 ? baseSal : 0;
   const driverFee = tripFee + salaryDue;
+
+  const totalBill = bill1 + bill2;
+  const totalPaid = bill1Paid + bill2Paid;
+  const totalPending = totalBill - totalPaid;
+
   return {
     trips: d.trips.length, tripFee, tripTarget, refillL, refillB,
     bill1, bill2, bill1Paid, bill2Paid, bill1Cnt, bill2Cnt, bill1PaidCnt, bill2PaidCnt,
-    totalBill: bill1 + bill2, totalPaid: bill1Paid + bill2Paid, totalPending: (bill1+bill2)-(bill1Paid+bill2Paid),
+    totalBill, totalPaid, totalPending,
+    // Carryover (รอบก่อนค้างจ่าย)
+    carryBill1, carryBill2, carryBillTotal, carryBill1Cnt, carryBill2Cnt, carryBillCnt,
+    // Grand totals (รวมรอบนี้ + carryover)
+    grandTotalBill: totalBill + carryBillTotal,
+    grandTotalPending: totalPending + carryBillTotal,
     income, outcome, profit, baseSal, driverFee, carryIn, carryOut
   };
 }
@@ -517,8 +602,16 @@ function renderTruckCards(p, summaries) {
     acc.totalBill += s.sum.totalBill; acc.totalPaid += s.sum.totalPaid;
     acc.pending += s.sum.totalPending; acc.trips += s.sum.trips;
     acc.driverPay += s.sum.driverFee;
+    acc.carryBillTotal += s.sum.carryBillTotal;
+    acc.carryBillCnt += s.sum.carryBillCnt;
+    acc.grandTotalBill += s.sum.grandTotalBill;
+    acc.grandTotalPending += s.sum.grandTotalPending;
     return acc;
-  }, {totalBill:0, totalPaid:0, pending:0, trips:0, driverPay:0});
+  }, {totalBill:0, totalPaid:0, pending:0, trips:0, driverPay:0, carryBillTotal:0, carryBillCnt:0, grandTotalBill:0, grandTotalPending:0});
+
+  const carryHint = fleet.carryBillTotal > 0
+    ? `<div style="font-size:11px;color:#92400e;margin-top:2px">⏳ ค้างเก่า ${fmtBahtShort(fleet.carryBillTotal)}</div>`
+    : '';
 
   let html = `
     <div class="section">📊 ภาพรวม — ${THAI_MONTHS_FULL[p.month]} ${p.year+543}</div>
@@ -527,10 +620,12 @@ function renderTruckCards(p, summaries) {
         <div class="fleet-cell">
           <div class="label">เที่ยวรวม</div>
           <div class="value">${fleet.trips} เที่ยว</div>
+          ${fleet.carryBillCnt > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:2px">+${fleet.carryBillCnt} เก่า</div>` : ''}
         </div>
         <div class="fleet-cell">
           <div class="label">วางบิลรวม</div>
-          <div class="value">${fmtBaht(fleet.totalBill)}</div>
+          <div class="value">${fmtBaht(fleet.grandTotalBill)}</div>
+          ${carryHint}
         </div>
         <div class="fleet-cell paid">
           <div class="label">จ่ายแล้ว</div>
@@ -538,7 +633,8 @@ function renderTruckCards(p, summaries) {
         </div>
         <div class="fleet-cell pending">
           <div class="label">ค้างชำระ</div>
-          <div class="value">${fmtBaht(fleet.pending)}</div>
+          <div class="value">${fmtBaht(fleet.grandTotalPending)}</div>
+          ${carryHint}
         </div>
       </div>
     </div>
@@ -574,13 +670,18 @@ function renderTruckCards(p, summaries) {
         <div class="tc-badges">
           <div class="badge bill1">
             <span class="name">บิล1 OGM</span>
-            <span>${sum.bill1PaidCnt}/${sum.bill1Cnt}</span>
+            <span>${sum.bill1PaidCnt}/${sum.bill1Cnt}${sum.carryBill1Cnt > 0 ? ` +${sum.carryBill1Cnt}เก่า` : ''}</span>
           </div>
           <div class="badge bill2">
             <span class="name">บิล2 อื่น</span>
-            <span>${sum.bill2PaidCnt}/${sum.bill2Cnt}</span>
+            <span>${sum.bill2PaidCnt}/${sum.bill2Cnt}${sum.carryBill2Cnt > 0 ? ` +${sum.carryBill2Cnt}เก่า` : ''}</span>
           </div>
         </div>
+        ${sum.carryBillTotal > 0 ? `
+          <div style="margin-top:6px;background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600">
+            ⏳ ค้างจากรอบก่อน ${sum.carryBillCnt} เที่ยว • ${fmtBahtShort(sum.carryBillTotal)} บ.
+          </div>
+        ` : ''}
         <div class="tc-fuel">
           <div class="badge ${fuelClass}">
             <span class="name">⛽ น้ำมัน</span>
@@ -687,9 +788,15 @@ function showDetail(plate) {
         <span class="lbl">บิล 2 (อื่นๆ)</span>
         <span class="val">${fmtBahtFull(sum.bill2)} · จ่าย ${sum.bill2PaidCnt}/${sum.bill2Cnt}</span>
       </div>
+      ${sum.carryBillTotal > 0 ? `
+        <div class="detail-row" style="background:#fef3c7;border-radius:6px;padding:6px 8px;margin:4px -8px">
+          <span class="lbl" style="color:#92400e">⏳ ค้างจากรอบก่อน (${sum.carryBillCnt} เที่ยว)</span>
+          <span class="val" style="color:#92400e;font-weight:600">${fmtBahtFull(sum.carryBillTotal)}</span>
+        </div>
+      ` : ''}
       <div class="detail-row total">
         <span class="lbl">ค้างชำระทั้งหมด</span>
-        <span class="val neg">${fmtBahtFull(sum.totalPending)}</span>
+        <span class="val neg">${fmtBahtFull(sum.grandTotalPending)}</span>
       </div>
     </div>
 
