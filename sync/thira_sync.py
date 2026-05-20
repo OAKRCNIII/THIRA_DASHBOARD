@@ -112,7 +112,14 @@ def parse_database(wb):
 
 
 def sync_to_supabase(rows):
-    """Replace ants.containers ทั้งหมด แล้ว insert ใหม่ (atomic-ish via delete+insert)"""
+    """
+    Atomic sync ผ่าน RPC function ants.sync_containers(jsonb)
+    ─────────────────────────────────────────────────────────
+    function นี้ทำ DELETE+INSERT ใน transaction เดียว + ถือ advisory lock
+    → กัน race condition เมื่อ local watcher + GitHub cron รันทับกัน
+
+    Fallback: ถ้า RPC ยังไม่ deploy (function ไม่มี) → ใช้แบบเดิม + warning
+    """
     from supabase import create_client
     URL = os.environ["SUPABASE_URL"]
     KEY = os.environ["SUPABASE_KEY"]
@@ -120,13 +127,29 @@ def sync_to_supabase(rows):
 
     log(f"📊 มี {len(rows)} rows จะ sync ลง ants.containers")
 
-    # ลบของเก่า (ANTS schema)
+    # ใช้ RPC atomic function (default)
+    try:
+        log("  ⚙️  เรียก ants.sync_containers (atomic) ...")
+        resp = supa.schema("ants").rpc("sync_containers", {"rows_json": rows}).execute()
+        result = resp.data[0] if resp.data else {}
+        deleted = result.get("deleted_count", "?")
+        inserted = result.get("inserted_count", 0)
+        log(f"     ลบ {deleted} rows → insert {inserted} rows  (atomic ✓)")
+        return inserted
+    except Exception as e:
+        msg = str(e)
+        # ถ้า function ไม่ exist — fallback ไปแบบเดิม (race-prone)
+        if "function" in msg.lower() and ("not exist" in msg.lower() or "not found" in msg.lower() or "PGRST202" in msg):
+            log(f"  ⚠️  RPC function ยังไม่ deploy — fallback แบบเดิม (เสี่ยง race)")
+            log(f"     → รัน sync_atomic.sql ที่ Supabase Dashboard ก่อน")
+        else:
+            raise
+
+    # ===== Fallback (เดิม) — ใช้เมื่อยังไม่ได้ deploy RPC =====
     log("  🗑️  ลบ rows เก่าทั้งหมด...")
-    # supabase-py ต้อง where condition — ใช้ id > 0 (จับทุก row)
     del_res = supa.schema("ants").table("containers").delete().gt("id", 0).execute()
     log(f"     ลบไป {len(del_res.data) if del_res.data else '?'} rows")
 
-    # Insert ใหม่เป็น chunk 500
     inserted = 0
     chunk = 500
     for i in range(0, len(rows), chunk):
