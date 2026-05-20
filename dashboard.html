@@ -407,6 +407,9 @@
     transition: all var(--t-fast);
   }
   .del-btn:hover { background: var(--danger-soft); color: var(--danger); }
+  /* ปุ่มแก้ note — ใช้ class del-btn เดิมแต่ override hover เป็น indigo */
+  .del-btn[title*="แก้"] { font-size: 12px; }
+  .del-btn[title*="แก้"]:hover { background: var(--accent-soft); color: var(--accent); }
 
   /* Extra trip form */
   .extra-form h3 { margin-bottom: 8px; font-size: 14px; color: var(--text-2); font-weight: 600; }
@@ -1323,7 +1326,11 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
     return `<tr class="row-fuel">
       <td class="cat">ค่าน้ำมัน</td>
       <td>${fmtThaiDate(r.date)}</td>
-      <td>${esc(r.note || 'เติมน้ำมัน')} <button class="del-btn" onclick="deleteOutcome(${r.id})" title="ลบ">×</button></td>
+      <td>
+        ${esc(r.note || 'เติมน้ำมัน')}
+        <button class="del-btn" onclick="editOutcomeNote(${r.id}, this.dataset.note)" data-note="${esc(r.note || '')}" title="แก้หมายเหตุ">✏️</button>
+        <button class="del-btn" onclick="deleteOutcome(${r.id})" title="ลบ">×</button>
+      </td>
       <td class="num">${fmtLiter(r.liters)}</td>
       <td class="num">${fmtBaht(r.amount)}</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
@@ -1338,7 +1345,11 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
     return `<tr class="row-other">
       <td class="cat">ค่าใช้จ่ายอื่นๆ</td>
       <td>${fmtThaiDate(o.date)}</td>
-      <td><strong>${esc(o.category)}</strong>${note !== o.category ? ' — ' + esc(note) : ''} <button class="del-btn" onclick="deleteOutcome(${o.id})" title="ลบ">×</button></td>
+      <td>
+        <strong>${esc(o.category)}</strong>${note !== o.category ? ' — ' + esc(note) : ''}
+        <button class="del-btn" onclick="editOutcomeNote(${o.id}, this.dataset.note)" data-note="${esc(o.note || '')}" title="แก้หมายเหตุ">✏️</button>
+        <button class="del-btn" onclick="deleteOutcome(${o.id})" title="ลบ">×</button>
+      </td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">${fmtBaht(o.amount)}</td>
     </tr>`;
@@ -1354,7 +1365,11 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
     return `<tr class="row-paid">
       <td class="cat">จ่ายคนขับ</td>
       <td>${fmtThaiDate(d.date)}</td>
-      <td>${esc(d.category)} — ${esc(d.note || 'บันทึกการจ่าย')} <button class="del-btn" onclick="deleteOutcome(${d.id})" title="ลบ">×</button></td>
+      <td>
+        ${esc(d.category)} — ${esc(d.note || 'บันทึกการจ่าย')}
+        <button class="del-btn" onclick="editOutcomeNote(${d.id}, this.dataset.note)" data-note="${esc(d.note || '')}" title="แก้หมายเหตุ">✏️</button>
+        <button class="del-btn" onclick="deleteOutcome(${d.id})" title="ลบ">×</button>
+      </td>
       <td class="num">—</td><td class="num">—</td>
       <td class="num">${d.category === 'ค่าเที่ยวคนขับ' ? fmtBaht(amt) : '—'}</td>
       <td class="num">${d.category === 'ค่าล่วง' ? fmtBaht(amt) : '—'}</td>
@@ -1921,7 +1936,10 @@ function renderInput(p, plate, data) {
     <td class="num">${o.liters ? fmtLiter(o.liters) + ' ล.' : '—'}</td>
     <td class="num">${fmtBaht(o.amount)}</td>
     <td><small>${esc(o.note || '')}</small></td>
-    <td><button class="del-btn" onclick="deleteOutcome(${o.id})">×</button></td>
+    <td>
+      <button class="del-btn" onclick="editOutcomeNote(${o.id}, this.dataset.note)" data-note="${esc(o.note || '')}" title="แก้หมายเหตุ">✏️</button>
+      <button class="del-btn" onclick="deleteOutcome(${o.id})" title="ลบ">×</button>
+    </td>
   </tr>`).join('');
 
   const recentIncs = data.incs.map(i => `<tr>
@@ -2664,6 +2682,24 @@ async function deleteOutcome(id) {
     setError('ลบไม่สำเร็จ: ' + e.message);
   }
 }
+
+/**
+ * แก้ note ของ outcome — prompt input ขึ้นมาให้ใส่ note ใหม่
+ * ไม่ต้องใช้ delete PIN เพราะแค่แก้ข้อความ ไม่ใช่ลบข้อมูล
+ */
+async function editOutcomeNote(id, currentNote) {
+  const newNote = prompt('แก้หมายเหตุ:', currentNote || '');
+  if (newNote === null) return;                    // user กด Cancel
+  if (newNote.trim() === (currentNote || '').trim()) return;   // ไม่มีการเปลี่ยน
+  try {
+    const r = await ths.from('outcomes').update({ note: newNote.trim() || null }).eq('id', id);
+    if (r.error) throw r.error;
+    reload();
+  } catch (e) {
+    setError('แก้ไขไม่สำเร็จ: ' + e.message);
+  }
+}
+window.editOutcomeNote = editOutcomeNote;
 
 async function deleteExtraTrip(id) {
   if (!confirm('ลบเที่ยวพิเศษนี้?')) return;
