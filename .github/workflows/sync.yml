@@ -1,10 +1,8 @@
 name: THIRA Auto Sync
 
 on:
-  # schedule disabled ชั่วคราวจนกว่าจะ deploy ants.sync_containers RPC
-  # (กัน race condition กับ local watcher — เปิดใหม่หลัง deploy)
-  # schedule:
-  #   - cron: '*/30 * * * *'
+  schedule:
+    - cron: '*/30 * * * *'   # ทุก 30 นาที (atomic RPC ป้องกัน race กับ watcher)
   workflow_dispatch:         # กดรันมือได้จาก GitHub
 
 jobs:

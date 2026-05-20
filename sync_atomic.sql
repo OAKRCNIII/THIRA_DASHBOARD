@@ -25,7 +25,8 @@ BEGIN
     PERFORM pg_advisory_xact_lock(847362001::bigint);
 
     -- 2) ลบของเก่าทั้งหมด (ใน transaction → atomic)
-    DELETE FROM ants.containers;
+    --    หมายเหตุ: ต้องมี WHERE clause เพราะ pg-safeupdate policy ของ Supabase
+    DELETE FROM ants.containers WHERE true;
     GET DIAGNOSTICS v_deleted = ROW_COUNT;
 
     -- 3) Insert ใหม่จาก JSON
