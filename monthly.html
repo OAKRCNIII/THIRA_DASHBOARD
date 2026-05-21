@@ -321,8 +321,8 @@ function renderMonthly(year, data, trucksAll) {
           ${f6Cells}
           <td class="num year-total"><strong class="${f6Year>=0?'profit-pos':'profit-neg'}">${f6Year>=0?'+':''}${fmtBaht(f6Year)}</strong></td>
         </tr>
-        <tr style="background:#fef3c7">
-          <td><span style="color:#92400e">🌐 XX-XXXX</span><br><small class="muted">ค่าใช้จ่ายส่วนรวม</small></td>
+        <tr class="clickable" style="background:#fef3c7" onclick="openTruckDetail('XX-XXXX', ${year})">
+          <td><span style="color:#92400e">🌐 XX-XXXX</span><br><small class="muted">ค่าใช้จ่ายส่วนรวม • คลิกดูรายละเอียด</small></td>
           ${xxCells}
           <td class="num year-total"><strong class="${xxYear>=0?'profit-pos':'profit-neg'}">${xxYear>=0?'+':''}${fmtBaht(xxYear)}</strong></td>
         </tr>
@@ -368,7 +368,11 @@ function changeYear(delta) {
 // ─── Truck detail modal ─────────────────────────
 async function openTruckDetail(plate, year) {
   try {
-    const truck = trucksCache.find(t => t.plate === plate);
+    let truck = trucksCache.find(t => t.plate === plate);
+    // XX-XXXX อาจไม่มีใน trucks table → สร้าง stub object
+    if (!truck && plate === 'XX-XXXX') {
+      truck = { plate: 'XX-XXXX', driver_name: 'ค่าใช้จ่ายส่วนรวม', fuel_route: null, monthly_salary: 0 };
+    }
     if (!truck) return;
     const start = `${year}-01-01`, end = `${year}-12-31`;
     setStatus(`กำลังโหลด ${plate}...`);
