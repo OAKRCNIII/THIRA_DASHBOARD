@@ -234,6 +234,30 @@ function renderMonthly(year, data, trucksAll) {
   for (const o of data.outs) ensure(o.truck_plate, parseInt(o.date.split('-')[1])).outcome += Number(o.amount);
   for (const i of data.incs) ensure(i.truck_plate, parseInt(i.date.split('-')[1])).income += Number(i.amount_net);
 
+  // Annual fee flags per (plate, month) — สำหรับโชว์ badge ในเซลล์
+  // {plate: {month: [{icon, label, amount}, ...]}}
+  const annualByMonth = {};
+  for (const o of data.outs) {
+    const amt = Number(o.amount);
+    if (amt <= 0) continue;
+    const m = parseInt(o.date.split('-')[1]);
+    let mark = null;
+    if (o.category === 'ประกัน') mark = { icon: '🛡', label: 'ประกัน', amount: amt };
+    else if (o.category === 'สุวิทย์') mark = { icon: '👤', label: 'สุวิทย์', amount: amt };
+    else if (/gps/i.test(o.note || '')) mark = { icon: '📡', label: 'GPS', amount: amt };
+    if (!mark) continue;
+    if (!annualByMonth[o.truck_plate]) annualByMonth[o.truck_plate] = {};
+    if (!annualByMonth[o.truck_plate][m]) annualByMonth[o.truck_plate][m] = [];
+    annualByMonth[o.truck_plate][m].push(mark);
+  }
+
+  // สร้าง html note ใต้เลขกำไร
+  const annualNoteHTML = (plate, month) => {
+    const marks = annualByMonth[plate]?.[month];
+    if (!marks || marks.length === 0) return '';
+    return `<div style="font-size:9px;color:#92400e;margin-top:2px;line-height:1.2" title="${marks.map(m=>m.label+' '+fmtBaht(m.amount)).join(' • ')}">${marks.map(m => m.icon).join('')} ${marks.map(m=>m.label).join(', ')}</div>`;
+  };
+
   const fmtCell = (income, outcome) => {
     const p = income - outcome;
     if (income === 0 && outcome === 0) return '<span class="muted">—</span>';
@@ -246,7 +270,7 @@ function renderMonthly(year, data, trucksAll) {
     const cells = monthKeys.map(m => {
       const c = agg[t.plate]?.[m] || {income:0, outcome:0};
       yIn += c.income; yOut += c.outcome;
-      return `<td class="num">${fmtCell(c.income, c.outcome)}</td>`;
+      return `<td class="num">${fmtCell(c.income, c.outcome)}${annualNoteHTML(t.plate, m)}</td>`;
     }).join('');
     const yp = yIn - yOut;
     return `<tr class="clickable" onclick="openTruckDetail('${t.plate}', ${year})">
@@ -273,7 +297,7 @@ function renderMonthly(year, data, trucksAll) {
   const xxCells = monthKeys.map(m => {
     const c = agg['XX-XXXX']?.[m] || {income:0, outcome:0};
     xxIn+=c.income; xxOut+=c.outcome;
-    return `<td class="num">${fmtCell(c.income, c.outcome)}</td>`;
+    return `<td class="num">${fmtCell(c.income, c.outcome)}${annualNoteHTML('XX-XXXX', m)}</td>`;
   }).join('');
   const xxYear = xxIn - xxOut;
 
