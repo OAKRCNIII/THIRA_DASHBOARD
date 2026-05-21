@@ -410,6 +410,9 @@ function renderTruckDetailModal(truck, year, outs, incs) {
     monthly[m].income += Number(i.amount_net);
   }
 
+  // เก็บ outs/incs ไว้ใน window scope เพื่อให้ drill-down ใช้ filter ได้
+  window.__truckModalData = { truck, year, outs, incs, monthly };
+
   // Year totals
   let yIn = 0, yOut = 0, yCount = 0;
   for (const m of monthKeys) {
@@ -437,17 +440,21 @@ function renderTruckDetailModal(truck, year, outs, incs) {
     </div>`;
   }).join('');
 
-  // Monthly table
+  // Monthly table — แต่ละแถวคลิกได้ ขยาย detail ขึ้นมาใต้
   const monthRows = monthKeys.map(m => {
     const c = monthly[m];
     const p = c.income - c.outcome;
     if (c.income === 0 && c.outcome === 0) return '';
-    return `<tr>
-      <td><strong>${THAI_MONTHS[m]}</strong></td>
-      <td class="num">${c.income > 0 ? fmtBaht(c.income) : '<span class="muted">—</span>'}</td>
-      <td class="num">${c.outcome > 0 ? fmtBaht(c.outcome) : '<span class="muted">—</span>'}</td>
-      <td class="num"><strong class="${p>=0?'profit-pos':'profit-neg'}">${p>=0?'+':''}${fmtBaht(p)}</strong></td>
-    </tr>`;
+    return `
+      <tr class="month-row" onclick="toggleMonthDetail(${m})" style="cursor:pointer">
+        <td><strong>${THAI_MONTHS[m]}</strong> <span class="caret" id="caret-m${m}" style="font-size:11px;color:#888;margin-left:4px">▸</span></td>
+        <td class="num">${c.income > 0 ? fmtBaht(c.income) : '<span class="muted">—</span>'}</td>
+        <td class="num">${c.outcome > 0 ? fmtBaht(c.outcome) : '<span class="muted">—</span>'}</td>
+        <td class="num"><strong class="${p>=0?'profit-pos':'profit-neg'}">${p>=0?'+':''}${fmtBaht(p)}</strong></td>
+      </tr>
+      <tr class="month-detail" id="detail-m${m}" style="display:none">
+        <td colspan="4" style="padding:0;background:#faf5ff"><div id="detail-content-m${m}"></div></td>
+      </tr>`;
   }).filter(s => s).join('');
 
   // Category breakdown bars
@@ -533,6 +540,149 @@ function renderTruckDetailModal(truck, year, outs, incs) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
+
+// ─── Drill-down: month → categories → items ─────────────────────
+const fmtThaiDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${y}`; };
+
+// หมวดที่ผูกกับ icon
+const CAT_ICONS = {
+  'ค่าน้ำมัน': '⛽', 'ค่ายาง': '🛞', 'เช็คระยะ': '🔧', 'ค่าผ่านด่าน': '🛣',
+  'ประกัน': '🛡', 'สุวิทย์': '👤', 'บุญช่วย': '👤', 'บัญชี': '📊',
+  'ร้อยละ4': '💼', 'ค่าเที่ยวคนขับ': '🚚', 'ค่าล่วง': '⏱', 'เงินเดือน': '💰',
+  'ค่าเคลียจ่าแชมป์': '💵', 'ค่าเคลียหมวดกร': '💵', 'อื่นๆ': '📌'
+};
+const catIcon = c => CAT_ICONS[c] || '📌';
+
+function toggleMonthDetail(m) {
+  const row = document.getElementById('detail-m' + m);
+  const caret = document.getElementById('caret-m' + m);
+  if (!row) return;
+  if (row.style.display === 'none') {
+    // populate content ตอนเปิด (lazy)
+    const content = document.getElementById('detail-content-m' + m);
+    if (content && !content.dataset.loaded) {
+      content.innerHTML = buildMonthBreakdown(m);
+      content.dataset.loaded = '1';
+    }
+    row.style.display = '';
+    if (caret) caret.textContent = '▾';
+  } else {
+    row.style.display = 'none';
+    if (caret) caret.textContent = '▸';
+  }
+}
+window.toggleMonthDetail = toggleMonthDetail;
+
+function buildMonthBreakdown(m) {
+  const d = window.__truckModalData;
+  if (!d) return '<div style="padding:14px">ไม่มีข้อมูล</div>';
+  const cat = d.monthly[m];
+  const month = m;
+
+  // รายรับของเดือนนี้
+  const incs = d.incs.filter(i => parseInt(i.date.split('-')[1]) === month);
+  // รายจ่ายของเดือนนี้
+  const outs = d.outs.filter(o => parseInt(o.date.split('-')[1]) === month);
+
+  // Income breakdown
+  const incBills = {};
+  for (const i of incs) {
+    const k = i.bill_type || 'OTHER';
+    incBills[k] = (incBills[k] || 0) + Number(i.amount_net);
+  }
+  const incRows = Object.entries(incBills).sort((a,b) => b[1]-a[1]).map(([k,v]) => `
+    <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px">
+      <span>💰 ${esc(k)}</span><span style="font-variant-numeric:tabular-nums">${fmtBaht(v)}</span>
+    </div>`).join('') || '<div style="color:#888;padding:4px 0;font-size:12px">— ไม่มีรายรับ —</div>';
+
+  // Outcome breakdown by category — sorted desc by amount
+  const cats = Object.entries(cat.byCat).sort((a,b) => b[1]-a[1]);
+  const outRows = cats.map(([c, v]) => `
+    <div onclick="toggleCategoryDetail(${m}, '${encodeURIComponent(c)}')"
+         style="display:flex;justify-content:space-between;padding:6px 8px;font-size:13px;cursor:pointer;border-radius:6px;transition:background 0.15s"
+         onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background=''">
+      <span>${catIcon(c)} ${esc(c)} <small style="color:#888">▸</small></span>
+      <span style="font-variant-numeric:tabular-nums;font-weight:600">${fmtBaht(v)}</span>
+    </div>
+    <div id="cat-detail-${m}-${encodeURIComponent(c)}" style="display:none;padding:0 8px 8px;margin-left:14px;border-left:2px solid #c4b5fd"></div>
+  `).join('') || '<div style="color:#888;padding:4px 0;font-size:12px">— ไม่มีรายจ่าย —</div>';
+
+  const profit = cat.income - cat.outcome;
+  return `
+    <div style="padding:14px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="background:white;padding:10px;border-radius:8px;border:1px solid #e5e7eb">
+          <div style="font-size:11px;color:#888">รายรับ (net)</div>
+          <div style="font-size:18px;font-weight:700;color:#15803d;font-variant-numeric:tabular-nums">${fmtBaht(cat.income)}</div>
+        </div>
+        <div style="background:white;padding:10px;border-radius:8px;border:1px solid #e5e7eb">
+          <div style="font-size:11px;color:#888">รายจ่าย</div>
+          <div style="font-size:18px;font-weight:700;color:#c05621;font-variant-numeric:tabular-nums">${fmtBaht(cat.outcome)}</div>
+        </div>
+        <div style="background:white;padding:10px;border-radius:8px;border:1px solid #e5e7eb">
+          <div style="font-size:11px;color:#888">กำไร</div>
+          <div style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:${profit>=0?'#15803d':'#c05621'}">${profit>=0?'+':''}${fmtBaht(profit)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="background:white;padding:12px;border-radius:8px;border:1px solid #e5e7eb">
+          <div style="font-size:12px;font-weight:600;color:#15803d;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e5e7eb">💰 รายรับแยกบิล</div>
+          ${incRows}
+        </div>
+        <div style="background:white;padding:12px;border-radius:8px;border:1px solid #e5e7eb">
+          <div style="font-size:12px;font-weight:600;color:#c05621;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e5e7eb">💸 รายจ่ายแยกหมวด <small style="color:#888;font-weight:400">(คลิกเพื่อดูรายการ)</small></div>
+          ${outRows}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleCategoryDetail(m, encCat) {
+  const cat = decodeURIComponent(encCat);
+  const id = `cat-detail-${m}-${encCat}`;
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    if (!el.dataset.loaded) {
+      el.innerHTML = buildCategoryItems(m, cat);
+      el.dataset.loaded = '1';
+    }
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+window.toggleCategoryDetail = toggleCategoryDetail;
+
+function buildCategoryItems(m, category) {
+  const d = window.__truckModalData;
+  if (!d) return '';
+  const items = d.outs
+    .filter(o => parseInt(o.date.split('-')[1]) === m && o.category === category)
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  if (items.length === 0) return '<div style="color:#888;padding:6px 8px;font-size:12px">— ไม่มีรายการ —</div>';
+
+  const rows = items.map(o => {
+    const liters = o.liters ? ` · ${Math.round(Number(o.liters))} ล.` : '';
+    const note = o.note ? ` <small style="color:#888">— ${esc(o.note)}</small>` : '';
+    return `<div style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;padding:4px 8px;font-size:12px;border-bottom:1px solid #f3f4f6">
+      <span style="color:#6b7280">${fmtThaiDate(o.date)}</span>
+      <span>${esc(o.note || o.category)}${liters}</span>
+      <span style="font-variant-numeric:tabular-nums;font-weight:600">${fmtBaht(o.amount)}</span>
+    </div>`;
+  }).join('');
+
+  const total = items.reduce((s, o) => s + Number(o.amount), 0);
+  return `<div style="padding:6px 0">
+    ${rows}
+    <div style="display:flex;justify-content:space-between;padding:6px 8px;margin-top:4px;background:#f3f4f6;border-radius:4px;font-size:12px;font-weight:600">
+      <span>${items.length} รายการ</span>
+      <span style="font-variant-numeric:tabular-nums">รวม ${fmtBaht(total)}</span>
+    </div>
+  </div>`;
+}
 
 document.getElementById('year-input').addEventListener('change', reload);
 document.getElementById('year-input').addEventListener('keydown', e => { if (e.key === 'Enter') reload(); });
