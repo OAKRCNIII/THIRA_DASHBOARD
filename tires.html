@@ -221,20 +221,19 @@ let cache = { tireRecords: [], currentPlate: TRUCKS[0].plate, selectedRecordId: 
 function parseWheels(note) {
   if (!note) return [];
   const wheels = new Set();
-  // จับ pattern (N, N, N) — ทุกวงเล็บ
-  const parens = note.matchAll(/\(([^)]+)\)/g);
-  for (const m of parens) {
-    const nums = m[1].match(/\d+/g);
+  const addNums = (str) => {
+    const nums = str.match(/\d+/g);
     if (nums) nums.forEach(n => { const x = +n; if (ALL_WHEELS.has(x)) wheels.add(x); });
-  }
-  // จับ "ล้อ N, N" หรือ "ล้อ N"  (ไม่จับ "ล้อหน้า" / "ล้อจักร" — เพราะตาม text)
-  const direct = note.matchAll(/ล้อ\s*(\d[\d\s,]*)/g);
-  for (const m of direct) {
-    const nums = m[1].match(/\d+/g);
-    if (nums) nums.forEach(n => { const x = +n; if (ALL_WHEELS.has(x)) wheels.add(x); });
-  }
-  // คำกำกวมเฉพาะที่ตรงตัว: "ล้อหน้า" / "ยางหน้า" / "ล้อจักร" / "ยางจักร"
-  // — "หน้า" = front axle = 1, 2 (ไม่กำกวมเพราะมีคู่เดียว)
+  };
+  // 1. จับ pattern (N, N, N) — ทุกวงเล็บ
+  for (const m of note.matchAll(/\(([^)]+)\)/g)) addNums(m[1]);
+  // 2. จับ "ล้อ N, N" หรือ "ล้อ N"  (ไม่จับ "ล้อหน้า" — handled below)
+  for (const m of note.matchAll(/ล้อ\s*(\d[\d\s,]*)/g)) addNums(m[1]);
+  // 3. จับ "ยาง N, N" หรือ "เปลี่ยนยาง N,N"  (เช่น "เปลี่ยนยาง 21,22")
+  //    NOT จับ "ยาง 2 ล้อหน้า" (มี "ล้อ" ตามหลัง — handle ด้านล่าง)
+  //    NOT จับ "ยาง 4 เส้น" (มี "เส้น" ตามหลัง — เป็นจำนวน)
+  for (const m of note.matchAll(/ยาง\s*(\d[\d\s,]*?)(?=\s*(?:ล้อ|เส้น|$|[^\d,\s]))/g)) addNums(m[1]);
+  // 4. "ล้อหน้า" / "ยางหน้า" = front axle = 1, 2
   if (/(ล้อ|ยาง)หน้า/.test(note)) { wheels.add(1); wheels.add(2); }
   return [...wheels].sort((a,b) => a-b);
 }
@@ -251,6 +250,8 @@ function classifyTire(note, amount) {
   const amt = Number(amount || 0);
   if (/ปะ/.test(n)) return 'patch';
   if (/สลับ|สับเปลี่ยน/.test(n) && amt <= 2000) return 'swap';
+  // เปลี่ยน "สแปร์/อะไหล่" + ราคาน้อย = ก็แค่เปลี่ยนยางสำรอง ไม่ใช่เปลี่ยนล้อรถ → swap
+  if (/เปลี่ยน/.test(n) && /สแปร์|อะไหล่/.test(n) && amt <= 2000) return 'swap';
   if (/เปลี่ยน/.test(n)) return 'replace';
   if (/สลับ/.test(n))    return 'swap';
   // Fallback: มี wheel number pattern + ราคาสูง → ถือเป็น replace
