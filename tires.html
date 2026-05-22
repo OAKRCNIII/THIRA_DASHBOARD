@@ -200,7 +200,7 @@
 <body>
 <div class="wrap">
   <div class="toolbar">
-    <h1>🛞 ประวัติเปลี่ยนยาง</h1>
+    <h1>⚙ ประวัติเปลี่ยนยาง</h1>
     <input id="year-input" type="number" min="2024" max="2030" style="width:90px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-family:inherit;font-size:14px">
     <button class="btn-print" onclick="reload()">🔄 โหลด</button>
     <button class="btn-print" onclick="printCurrent()">🖨️ พิมพ์คันนี้</button>
@@ -418,7 +418,7 @@ function renderForPlate(plate) {
     : recordsDesc.map(r => `
         <div class="history-item ${r.id === cache.selectedRecordId ? 'active' : ''}" onclick="selectRecord(${r.id})">
           <div class="date">${fmtThaiDate(r.date)}</div>
-          <div class="wheels">🛞 ล้อ ${r.wheels.join(', ')} <span style="font-weight:400;color:#888">(${r.wheels.length} เส้น)</span></div>
+          <div class="wheels">⚙ ล้อ ${r.wheels.join(', ')} <span style="font-weight:400;color:#888">(${r.wheels.length} เส้น)</span></div>
           <div class="note">${esc(r.note || '—')}</div>
           <div class="amount">${fmtBaht(r.amount)} บ.</div>
         </div>
