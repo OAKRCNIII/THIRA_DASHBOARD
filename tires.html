@@ -240,10 +240,14 @@ function parseWheels(note) {
 }
 
 // แยกประเภทรายการยาง — เปลี่ยน / ปะ / สลับ
-function classifyTire(note) {
+// Heuristic: ใช้ keyword + amount ช่วยเรื่อง "สับเปลี่ยนยางอะไหล่ 400 บ." ที่ถูก match เป็น "เปลี่ยน" ผิด
+function classifyTire(note, amount) {
   const n = (note || '').toLowerCase();
-  if (/เปลี่ยน/.test(n)) return 'replace';   // priority: ถ้ามี "เปลี่ยน" = replacement
-  if (/ปะ/.test(n))      return 'patch';
+  const amt = Number(amount || 0);
+  if (/ปะ/.test(n)) return 'patch';
+  // "สลับ" หรือ "สับเปลี่ยน" + ราคาน้อย (≤ 2000) = ก็แค่ swap/สลับ ไม่ใช่เปลี่ยนจริง
+  if (/สลับ|สับเปลี่ยน/.test(n) && amt <= 2000) return 'swap';
+  if (/เปลี่ยน/.test(n)) return 'replace';
   if (/สลับ/.test(n))    return 'swap';
   return 'other';
 }
@@ -262,7 +266,7 @@ async function reload() {
     cache.tireRecords = (data || []).map(r => ({
       ...r,
       wheels: parseWheels(r.note),
-      kind: classifyTire(r.note)
+      kind: classifyTire(r.note, r.amount)
     }));
     setStatus(null);
     renderTabs();
@@ -314,8 +318,11 @@ window.toggleDetail = toggleDetail;
 function renderForPlate(plate) {
   // ทุก records ของรถนี้
   const all = cache.tireRecords.filter(r => r.truck_plate === plate);
-  // เฉพาะ "เปลี่ยน" ที่มีเลขล้อ → จะใส่ลง diagram
-  const records = all.filter(r => r.kind === 'replace' && r.wheels.length > 0);
+  // "เปลี่ยน" ทั้งหมด — รวมที่ไม่ระบุล้อด้วย (เพื่อให้ยอดรวมตรงกับ monthly view)
+  const replacements = all.filter(r => r.kind === 'replace');
+  // เฉพาะ replace ที่ระบุล้อ → ใส่ลง diagram + history
+  const records = replacements.filter(r => r.wheels.length > 0);
+  const replaceNoWheel = replacements.filter(r => r.wheels.length === 0);
   // ปะยาง + สลับยาง (ไม่ติด wheel diagram)
   const patches = all.filter(r => r.kind === 'patch');
   const swaps   = all.filter(r => r.kind === 'swap');
@@ -349,10 +356,10 @@ function renderForPlate(plate) {
   // ── Totals แยกประเภท ──
   const sumCost = arr => arr.reduce((s, r) => s + Number(r.amount || 0), 0);
   const totalWheels = records.reduce((s, r) => s + r.wheels.length, 0);
-  const replaceCost = sumCost(records);
+  const replaceCost = sumCost(replacements);   // รวมทุก replace แม้ไม่ระบุล้อ
   const patchCost   = sumCost(patches);
   const swapCost    = sumCost(swaps);
-  const grandCost   = replaceCost + patchCost + swapCost;
+  const grandCost   = replaceCost + patchCost + swapCost + sumCost(all.filter(r => r.kind === 'other'));
 
   // History list — เฉพาะ "เปลี่ยน" เท่านั้น (ปะ/สลับ ดูใน popout ด้านบน)
   const recordsDesc = [...records].sort((a, b) => b.date.localeCompare(a.date));
@@ -386,7 +393,8 @@ function renderForPlate(plate) {
       <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:10px;text-align:center">
         <div style="font-size:10px;color:#ea580c;font-weight:500">🔄 เปลี่ยน</div>
         <div class="num" style="font-size:18px;font-weight:700;color:#c2410c">${totalWheels} <small style="font-size:11px;font-weight:500">เส้น</small></div>
-        <div style="font-size:10px;color:#92400e">${records.length} ครั้ง • ${fmtBaht(replaceCost)} ฿</div>
+        <div style="font-size:10px;color:#92400e">${replacements.length} ครั้ง • ${fmtBaht(replaceCost)} ฿</div>
+        ${replaceNoWheel.length > 0 ? `<div style="font-size:9px;color:#9a3412;margin-top:2px">+${replaceNoWheel.length} ครั้งไม่ระบุล้อ</div>` : ''}
       </div>
       <div onclick="toggleDetail('patch')" style="background:${isPatchOpen?'#dbeafe':'#eff6ff'};border:1px solid ${isPatchOpen?'#60a5fa':'#bfdbfe'};padding:10px;border-radius:10px;text-align:center;cursor:pointer;transition:all 0.15s">
         <div style="font-size:10px;color:#2563eb;font-weight:500">🩹 ปะยาง ${isPatchOpen?'▾':'▸'}</div>
