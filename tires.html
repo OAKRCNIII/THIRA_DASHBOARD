@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ประวัติเปลี่ยนยาง — THIRA</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="icon-192.png">
+<script src="auth.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Sarabun', sans-serif; margin: 0; padding: 16px; background: #f0f2f5; color: #222; }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1, h2, h3 { margin: 0; }
+  .num { font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+
+  /* Toolbar */
+  .toolbar { background: white; padding: 14px 18px; border-radius: 12px; margin-bottom: 14px;
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .toolbar h1 { font-size: 18px; color: #1e3a5f; display: flex; align-items: center; gap: 8px; margin-right: auto; }
+  .back-link { padding: 6px 14px; background: #6b7280; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; }
+  .btn-print { padding: 6px 14px; background: #1e3a5f; color: white; border: 0; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+
+  /* Truck tabs */
+  .truck-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .truck-tab { padding: 8px 14px; background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+    cursor: pointer; font-family: inherit; font-size: 13px; color: #4b5563; font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: all 0.15s; }
+  .truck-tab:hover { background: #f9fafb; border-color: #d1d5db; }
+  .truck-tab.active { background: #1e3a5f; color: white; border-color: #1e3a5f; box-shadow: 0 4px 12px rgba(30,58,95,0.25); }
+  .truck-tab .plate { font-weight: 600; font-family: 'Inter', sans-serif; }
+  .truck-tab .driver { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+
+  /* Layout 2-column */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  /* Diagram card */
+  .card { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .card h2 { font-size: 14px; color: #6b7280; margin-bottom: 14px; font-weight: 600; }
+
+  /* Wheel layout */
+  .section { margin-bottom: 28px; }
+  .section-title { text-align: center; font-size: 16px; font-weight: 600; color: #1e3a5f; margin-bottom: 14px; }
+
+  .row { display: flex; justify-content: center; align-items: center; gap: 4px; margin-bottom: 8px; position: relative; }
+  .axle-line {
+    position: absolute; left: 50%; right: 50%; top: 50%;
+    height: 4px; background: #f97316; transform: translate(-50%, -50%);
+  }
+
+  /* Front single axle: 1, 2 — narrow gap */
+  .row.front { gap: 80px; padding: 0 calc(50% - 80px); }
+  /* Drive/trailer with dual: outer + inner per side, gap in middle */
+  .row.dual-axle { gap: 60px; }
+  .dual { display: flex; gap: 2px; }
+
+  /* Connector line below axle */
+  .row.dual-axle::before {
+    content: ''; position: absolute; top: 50%; left: calc(50% - 50px); right: calc(50% - 50px);
+    height: 3px; background: #f97316; transform: translateY(-50%); z-index: 0;
+  }
+  .row.front::before {
+    content: ''; position: absolute; top: 50%; left: calc(50% - 50px); right: calc(50% - 50px);
+    height: 3px; background: #f97316; transform: translateY(-50%); z-index: 0;
+  }
+  .row .dual, .row .wheel { position: relative; z-index: 1; }
+
+  /* Vertical connector — only in head section, between rows */
+  .head-grid { position: relative; }
+  .head-grid::before {
+    content: ''; position: absolute; top: 35px; bottom: 35px;
+    left: 50%; width: 3px; background: #f97316; transform: translateX(-50%);
+    z-index: 0;
+  }
+  .head-grid .row { z-index: 1; }
+
+  /* Wheel circle */
+  .wheel {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 2px solid #16a34a; background: white;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; color: #222;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  /* Changed wheel — colored by date order (oldest → newest) */
+  .wheel.changed {
+    border-width: 3px;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.1);
+  }
+  .wheel.changed.t-0 { background: #fef9c3; border-color: #eab308; }   /* oldest */
+  .wheel.changed.t-1 { background: #fed7aa; border-color: #ea580c; }
+  .wheel.changed.t-2 { background: #fecaca; border-color: #dc2626; }
+  .wheel.changed.t-3 { background: #fbcfe8; border-color: #db2777; }
+  .wheel.changed.t-4 { background: #ddd6fe; border-color: #7c3aed; }
+  .wheel.changed.t-5 { background: #bae6fd; border-color: #0284c7; }   /* newest */
+
+  /* Highlighted (selected history) */
+  .wheel.selected {
+    border-color: #dc2626 !important;
+    border-width: 4px;
+    background: #fef2f2 !important;
+    color: #dc2626;
+    box-shadow: 0 0 0 4px rgba(220,38,38,0.2), 0 4px 12px rgba(220,38,38,0.3);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  /* History list */
+  .history { max-height: 600px; overflow-y: auto; }
+  .history-item {
+    padding: 12px 14px; border-radius: 8px; margin-bottom: 8px;
+    border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.15s;
+    background: white;
+  }
+  .history-item:hover { border-color: #1e3a5f; background: #f9fafb; }
+  .history-item.active { border-color: #dc2626; background: #fef2f2; box-shadow: 0 0 0 2px rgba(220,38,38,0.1); }
+  .history-item .date { font-size: 11px; color: #6b7280; font-weight: 600; }
+  .history-item .wheels {
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 14px;
+    color: #1e3a5f; margin: 4px 0;
+  }
+  .history-item .note { font-size: 12px; color: #4b5563; }
+  .history-item .amount { font-size: 13px; font-weight: 600; color: #c05621; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Summary footer */
+  .summary {
+    margin-top: 12px; padding: 12px 14px; background: #1e3a5f; color: white;
+    border-radius: 8px; font-size: 13px; display: flex; justify-content: space-between;
+  }
+  .summary strong { font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+
+  /* Legend */
+  .legend { font-size: 11px; color: #6b7280; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid; display: inline-block; }
+
+  .status { padding: 10px 14px; background: #fef3c7; color: #92400e; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+  .empty { color: #888; text-align: center; padding: 30px; font-style: italic; }
+
+  /* Print */
+  @page { size: A4 landscape; margin: 10mm; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: white; padding: 0; }
+    .toolbar, .truck-tabs, .back-link, .btn-print { display: none; }
+    .layout { grid-template-columns: 1fr 380px; }
+    .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="toolbar">
+    <h1>🛞 ประวัติเปลี่ยนยาง</h1>
+    <input id="year-input" type="number" min="2024" max="2030" style="width:90px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-family:inherit;font-size:14px">
+    <button class="btn-print" onclick="reload()">🔄 โหลด</button>
+    <button class="btn-print" onclick="window.print()">🖨️ พิมพ์</button>
+    <a class="back-link" href="dashboard.html">← Dashboard</a>
+  </div>
+
+  <div class="truck-tabs" id="truck-tabs"></div>
+  <div id="status" class="status" style="display:none">กำลังโหลด...</div>
+  <div id="content"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
+const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });
+
+const fmtBaht = (n) => Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:2});
+const fmtThaiDate = iso => { if(!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${+y-543<2000?+y:+y-543+543}`; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ── Wheel layout (ตามแผนภาพที่ user ส่งมา) ──
+// ส่วนหัว: 1,2 (front) / 5,6 | 7,8 (drive 1) / 9,10 | 11,12 (drive 2)
+// ส่วนหาง: 21,22 | 23,24 / 25,26 | 27,28 / 29,30 | 31,32
+const HEAD_ROWS = [
+  { type: 'front', wheels: [[1], [2]] },          // 2 single, gap large
+  { type: 'dual',  wheels: [[5,6], [7,8]] },      // 2 dual
+  { type: 'dual',  wheels: [[9,10], [11,12]] }
+];
+const TAIL_ROWS = [
+  { type: 'dual', wheels: [[21,22], [23,24]] },
+  { type: 'dual', wheels: [[25,26], [27,28]] },
+  { type: 'dual', wheels: [[29,30], [31,32]] }
+];
+// flat list ของเลขล้อทั้งหมด (ใช้ validate)
+const ALL_WHEELS = new Set([...HEAD_ROWS, ...TAIL_ROWS].flatMap(r => r.wheels.flat()));
+
+const TRUCKS = [
+  { plate: '71-9538', driver: 'นายหัวเลย่' },
+  { plate: '72-1620', driver: 'นายหัวปอ' },
+  { plate: '72-2237', driver: 'นายหัวประเสริฐ' },
+  { plate: '72-2420', driver: 'นายหัวบังเฮง' },
+  { plate: '72-2953', driver: 'นายหัวบังฟี' },
+  { plate: '72-3148', driver: 'นายหัวอาคม' }
+];
+
+let cache = { tireRecords: [], currentPlate: TRUCKS[0].plate, selectedRecordId: null };
+
+/**
+ * Extract wheel numbers from note text
+ *   "(5,6,7,8)"     → [5,6,7,8]
+ *   "ล้อ 5,6"        → [5,6]
+ *   "(5,6) + สลับ" → [5,6]
+ */
+function parseWheels(note) {
+  if (!note) return [];
+  const wheels = new Set();
+  // จับ pattern (N, N, N) — ทุกวงเล็บ
+  const parens = note.matchAll(/\(([^)]+)\)/g);
+  for (const m of parens) {
+    const nums = m[1].match(/\d+/g);
+    if (nums) nums.forEach(n => { const x = +n; if (ALL_WHEELS.has(x)) wheels.add(x); });
+  }
+  // จับ "ล้อ N, N" หรือ "ล้อ N"
+  const direct = note.matchAll(/ล้อ\s*(\d+(?:\s*,\s*\d+)*)/g);
+  for (const m of direct) {
+    const nums = m[1].match(/\d+/g);
+    if (nums) nums.forEach(n => { const x = +n; if (ALL_WHEELS.has(x)) wheels.add(x); });
+  }
+  return [...wheels].sort((a,b) => a-b);
+}
+
+async function reload() {
+  try {
+    setStatus('กำลังโหลดข้อมูลยาง...');
+    const yr = parseInt(document.getElementById('year-input').value) || new Date().getFullYear();
+    const start = `${yr}-01-01`, end = `${yr}-12-31`;
+    const { data, error } = await ths.from('outcomes')
+      .select('id,truck_plate,date,amount,note')
+      .eq('category', 'ค่ายาง')
+      .gte('date', start).lte('date', end)
+      .order('date');
+    if (error) throw error;
+    // เฉพาะที่ extract ล้อได้
+    cache.tireRecords = (data || []).map(r => ({ ...r, wheels: parseWheels(r.note) }));
+    setStatus(null);
+    renderTabs();
+    renderForPlate(cache.currentPlate);
+  } catch (e) {
+    setStatus(null);
+    document.getElementById('content').innerHTML = `<div class="empty" style="color:#c53030">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+function setStatus(msg) {
+  const s = document.getElementById('status');
+  if (msg) { s.textContent = msg; s.style.display = ''; }
+  else s.style.display = 'none';
+}
+
+function renderTabs() {
+  const html = TRUCKS.map(t => `
+    <button class="truck-tab ${t.plate === cache.currentPlate ? 'active' : ''}"
+            onclick="selectPlate('${t.plate}')">
+      <span class="plate">${t.plate}</span>
+      <span class="driver">${esc(t.driver)}</span>
+    </button>
+  `).join('');
+  document.getElementById('truck-tabs').innerHTML = html;
+}
+
+function selectPlate(plate) {
+  cache.currentPlate = plate;
+  cache.selectedRecordId = null;
+  renderTabs();
+  renderForPlate(plate);
+}
+window.selectPlate = selectPlate;
+
+function selectRecord(id) {
+  cache.selectedRecordId = (cache.selectedRecordId === id ? null : id);
+  renderForPlate(cache.currentPlate);
+}
+window.selectRecord = selectRecord;
+
+function renderForPlate(plate) {
+  const records = cache.tireRecords.filter(r => r.truck_plate === plate && r.wheels.length > 0);
+
+  // คำนวณ tier (สีของล้อ) ตามลำดับวันที่ — เก่าสุด=0, ใหม่สุด=N
+  const wheelTier = {};   // wheelNum → tier
+  const selected = new Set();
+  if (cache.selectedRecordId) {
+    const r = records.find(x => x.id === cache.selectedRecordId);
+    if (r) r.wheels.forEach(w => selected.add(w));
+  }
+  records.forEach((r, idx) => {
+    const tier = records.length > 1 ? Math.min(5, Math.floor(idx / (records.length / 6))) : 0;
+    r.wheels.forEach(w => { wheelTier[w] = tier; });
+  });
+
+  // Render diagram
+  const renderRow = (row) => {
+    const cells = row.wheels.map(group => {
+      if (group.length === 1) {
+        return renderWheel(group[0], wheelTier, selected);
+      }
+      return `<div class="dual">${group.map(w => renderWheel(w, wheelTier, selected)).join('')}</div>`;
+    }).join('');
+    return `<div class="row ${row.type === 'front' ? 'front' : 'dual-axle'}">${cells}</div>`;
+  };
+
+  const headHTML = `<div class="head-grid">${HEAD_ROWS.map(renderRow).join('')}</div>`;
+  const tailHTML = `<div>${TAIL_ROWS.map(renderRow).join('')}</div>`;
+
+  // History list
+  const totalCost = records.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const totalWheels = records.reduce((s, r) => s + r.wheels.length, 0);
+  const historyHTML = records.length === 0
+    ? '<div class="empty">— ไม่มีประวัติเปลี่ยนยางในปีนี้ —</div>'
+    : records.map(r => `
+        <div class="history-item ${r.id === cache.selectedRecordId ? 'active' : ''}" onclick="selectRecord(${r.id})">
+          <div class="date">${fmtThaiDate(r.date)}</div>
+          <div class="wheels">🛞 ล้อ ${r.wheels.join(', ')} <span style="font-weight:400;color:#888">(${r.wheels.length} เส้น)</span></div>
+          <div class="note">${esc(r.note || '—')}</div>
+          <div class="amount">${fmtBaht(r.amount)} บ.</div>
+        </div>
+      `).join('');
+
+  const truckInfo = TRUCKS.find(t => t.plate === plate);
+  document.getElementById('content').innerHTML = `
+    <div class="layout">
+      <div class="card">
+        <h2>🚛 ${plate} — ${esc(truckInfo?.driver || '')}</h2>
+
+        <div class="section">
+          <div class="section-title">ส่วนหัว</div>
+          ${headHTML}
+        </div>
+
+        <div class="section">
+          <div class="section-title">ส่วนหาง</div>
+          ${tailHTML}
+        </div>
+
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="border-color:#16a34a"></span>ปกติ</span>
+          <span class="legend-item"><span class="legend-dot" style="border-color:#eab308;background:#fef9c3"></span>เปลี่ยนนานสุด</span>
+          <span class="legend-item"><span class="legend-dot" style="border-color:#0284c7;background:#bae6fd"></span>เปลี่ยนล่าสุด</span>
+          <span class="legend-item"><span class="legend-dot" style="border-color:#dc2626;background:#fef2f2"></span>ที่เลือก</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 ประวัติการเปลี่ยน <small style="font-weight:400;color:#888">(คลิกเพื่อ highlight)</small></h2>
+        <div class="history">${historyHTML}</div>
+        ${records.length > 0 ? `
+          <div class="summary">
+            <span>${records.length} ครั้ง • ${totalWheels} เส้น</span>
+            <span>รวม <strong>${fmtBaht(totalCost)}</strong> บ.</span>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderWheel(num, tierMap, selected) {
+  const tier = tierMap[num];
+  let cls = 'wheel';
+  if (selected.has(num)) cls += ' selected';
+  else if (tier !== undefined) cls += ` changed t-${tier}`;
+  return `<div class="${cls}">${num}</div>`;
+}
+
+// Init
+document.getElementById('year-input').value = new Date().getFullYear();
+document.getElementById('year-input').addEventListener('change', reload);
+reload();
+</script>
+</body>
+</html>
