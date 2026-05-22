@@ -75,34 +75,40 @@
   }
   .head-grid .row { z-index: 1; }
 
-  /* Wheel circle */
+  /* ─── Wheel — แบบ "ยางมีล้อแม็ก" ดูสวยเหมือนยางจริง ─── */
   .wheel {
-    width: 52px; height: 52px; border-radius: 50%;
-    border: 2px solid #16a34a; background: white;
+    width: 56px; height: 56px; border-radius: 50%;
+    /* ชั้นนอก = ยาง (ดำเข้ม) */
+    background:
+      radial-gradient(circle at 50% 50%,
+        #fafafa 0% 38%,                 /* ดุม white */
+        #e5e7eb 38% 42%,                /* ขอบดุม */
+        #1f2937 42% 46%,                /* gap ดำ */
+        #e5e7eb 46% 50%,                /* ขอบล้อแม็ก */
+        #1f2937 50% 100%                /* ยางดำ */
+      );
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; color: #222;
+    font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700; color: #1f2937;
     transition: all 0.2s;
     cursor: default;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15), inset 0 1px 1px rgba(255,255,255,0.3);
+    position: relative;
   }
-  /* Changed wheel — colored by date order (oldest → newest) */
-  .wheel.changed {
-    border-width: 3px;
-    box-shadow: 0 0 0 2px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.1);
-  }
-  .wheel.changed.t-0 { background: #fef9c3; border-color: #eab308; }   /* oldest */
-  .wheel.changed.t-1 { background: #fed7aa; border-color: #ea580c; }
-  .wheel.changed.t-2 { background: #fecaca; border-color: #dc2626; }
-  .wheel.changed.t-3 { background: #fbcfe8; border-color: #db2777; }
-  .wheel.changed.t-4 { background: #ddd6fe; border-color: #7c3aed; }
-  .wheel.changed.t-5 { background: #bae6fd; border-color: #0284c7; }   /* newest */
 
-  /* Highlighted (selected history) */
+  /* Changed — ไส้กลางเปลี่ยนสีตามลำดับเก่า→ใหม่ */
+  .wheel.changed { box-shadow: 0 3px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3); }
+  .wheel.changed.t-0 { background: radial-gradient(circle at 50% 50%, #fef9c3 0% 38%, #eab308 38% 50%, #1f2937 50% 100%); }
+  .wheel.changed.t-1 { background: radial-gradient(circle at 50% 50%, #fed7aa 0% 38%, #ea580c 38% 50%, #1f2937 50% 100%); }
+  .wheel.changed.t-2 { background: radial-gradient(circle at 50% 50%, #fecaca 0% 38%, #dc2626 38% 50%, #1f2937 50% 100%); }
+  .wheel.changed.t-3 { background: radial-gradient(circle at 50% 50%, #fbcfe8 0% 38%, #db2777 38% 50%, #1f2937 50% 100%); }
+  .wheel.changed.t-4 { background: radial-gradient(circle at 50% 50%, #ddd6fe 0% 38%, #7c3aed 38% 50%, #1f2937 50% 100%); }
+  .wheel.changed.t-5 { background: radial-gradient(circle at 50% 50%, #bae6fd 0% 38%, #0284c7 38% 50%, #1f2937 50% 100%); }
+
+  /* Highlighted */
   .wheel.selected {
-    border-color: #dc2626 !important;
-    border-width: 4px;
-    background: #fef2f2 !important;
-    color: #dc2626;
-    box-shadow: 0 0 0 4px rgba(220,38,38,0.2), 0 4px 12px rgba(220,38,38,0.3);
+    background: radial-gradient(circle at 50% 50%, #ffffff 0% 38%, #dc2626 38% 50%, #7f1d1d 50% 100%) !important;
+    color: #7f1d1d !important;
+    box-shadow: 0 0 0 4px rgba(220,38,38,0.25), 0 6px 14px rgba(220,38,38,0.4) !important;
     animation: pulse 1.5s ease-in-out infinite;
   }
   @keyframes pulse {
