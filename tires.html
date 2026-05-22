@@ -162,14 +162,38 @@
   .status { padding: 10px 14px; background: #fef3c7; color: #92400e; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
   .empty { color: #888; text-align: center; padding: 30px; font-style: italic; }
 
-  /* Print */
-  @page { size: A4 landscape; margin: 10mm; }
+  /* Print — A4 landscape, 1 คัน/หน้า */
+  @page { size: A4 landscape; margin: 8mm; }
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { background: white; padding: 0; }
-    .toolbar, .truck-tabs, .back-link, .btn-print { display: none; }
-    .layout { grid-template-columns: 1fr 380px; }
-    .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+    html, body { background: white; padding: 0; margin: 0; font-size: 11px; }
+    .wrap { padding: 0; max-width: none; }
+    .toolbar, .truck-tabs, .back-link, .btn-print, .status { display: none !important; }
+    .layout { grid-template-columns: 1fr 320px; gap: 8px; }
+    .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; padding: 10px 12px; }
+    .card h2 { font-size: 12px; margin-bottom: 8px; }
+    /* แต่ละ truck-page = 1 หน้า */
+    .truck-page { page-break-after: always; }
+    .truck-page:last-child { page-break-after: auto; }
+    /* compact diagram */
+    .wheel { width: 44px; height: 44px; font-size: 12px; }
+    .wheel-wrap { min-width: 48px; gap: 2px; }
+    .wheel-date { font-size: 9px; padding: 0 4px; }
+    .wheel-date-spacer { height: 12px; }
+    .row { margin-bottom: 8px !important; }
+    .row.front { gap: 64px !important; padding: 0 !important; }
+    .row.dual-axle { gap: 44px !important; }
+    .section { margin-bottom: 14px !important; }
+    .section-title { font-size: 13px !important; margin-bottom: 8px !important; }
+    .head-grid::before { top: 30px !important; bottom: 50px !important; }
+    .row.dual-axle::before, .row.front::before { left: calc(50% - 44px) !important; right: calc(50% - 44px) !important; }
+    /* history list compact */
+    .history { max-height: none !important; overflow: visible; }
+    .history-item { padding: 6px 10px; margin-bottom: 4px; font-size: 11px; }
+    .history-item .date { font-size: 10px; }
+    .history-item .wheels { font-size: 12px; }
+    .history-item .note { font-size: 10px; }
+    .legend { font-size: 9px; gap: 6px; margin-top: 6px; }
   }
 </style>
 </head>
@@ -179,7 +203,8 @@
     <h1>🛞 ประวัติเปลี่ยนยาง</h1>
     <input id="year-input" type="number" min="2024" max="2030" style="width:90px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-family:inherit;font-size:14px">
     <button class="btn-print" onclick="reload()">🔄 โหลด</button>
-    <button class="btn-print" onclick="window.print()">🖨️ พิมพ์</button>
+    <button class="btn-print" onclick="printCurrent()">🖨️ พิมพ์คันนี้</button>
+    <button class="btn-print" onclick="printAll()" style="background:#c2410c">🖨️ พิมพ์ 6 คัน</button>
     <a class="back-link" href="dashboard.html">← Dashboard</a>
   </div>
 
@@ -455,36 +480,80 @@ function renderForPlate(plate) {
 
   const truckInfo = TRUCKS.find(t => t.plate === plate);
   document.getElementById('content').innerHTML = `
-    <div class="layout">
-      <div class="card">
-        <h2>🚛 ${plate} — ${esc(truckInfo?.driver || '')}</h2>
+    <div class="truck-page">
+      <div class="layout">
+        <div class="card">
+          <h2>🚛 ${plate} — ${esc(truckInfo?.driver || '')}</h2>
 
-        <div class="section">
-          <div class="section-title">ส่วนหัว</div>
-          ${headHTML}
+          <div class="section">
+            <div class="section-title">ส่วนหัว</div>
+            ${headHTML}
+          </div>
+
+          <div class="section">
+            <div class="section-title">ส่วนหาง</div>
+            ${tailHTML}
+          </div>
+
+          <div class="legend">
+            <span class="legend-item"><span class="legend-dot" style="border-color:#16a34a"></span>ปกติ</span>
+            <span class="legend-item"><span class="legend-dot" style="border-color:#eab308;background:#fef9c3"></span>เปลี่ยนนานสุด</span>
+            <span class="legend-item"><span class="legend-dot" style="border-color:#0284c7;background:#bae6fd"></span>เปลี่ยนล่าสุด</span>
+            <span class="legend-item"><span class="legend-dot" style="border-color:#dc2626;background:#fef2f2"></span>ที่เลือก</span>
+          </div>
         </div>
 
-        <div class="section">
-          <div class="section-title">ส่วนหาง</div>
-          ${tailHTML}
+        <div class="card">
+          <h2>📋 ประวัติการเปลี่ยน <small style="font-weight:400;color:#888">(คลิกเพื่อ highlight)</small></h2>
+          ${topSummary}
+          <div class="history">${historyHTML}</div>
         </div>
-
-        <div class="legend">
-          <span class="legend-item"><span class="legend-dot" style="border-color:#16a34a"></span>ปกติ</span>
-          <span class="legend-item"><span class="legend-dot" style="border-color:#eab308;background:#fef9c3"></span>เปลี่ยนนานสุด</span>
-          <span class="legend-item"><span class="legend-dot" style="border-color:#0284c7;background:#bae6fd"></span>เปลี่ยนล่าสุด</span>
-          <span class="legend-item"><span class="legend-dot" style="border-color:#dc2626;background:#fef2f2"></span>ที่เลือก</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>📋 ประวัติการเปลี่ยน <small style="font-weight:400;color:#888">(คลิกเพื่อ highlight)</small></h2>
-        ${topSummary}
-        <div class="history">${historyHTML}</div>
       </div>
     </div>
   `;
 }
+
+/** พิมพ์คันเดียว (ที่เปิดอยู่) */
+function printCurrent() {
+  window.print();
+}
+window.printCurrent = printCurrent;
+
+/** พิมพ์ทั้ง 6 คัน — 1 คัน/หน้า */
+async function printAll() {
+  const originalPlate = cache.currentPlate;
+  const originalSelected = cache.selectedRecordId;
+  const originalDetail = cache.openDetail;
+
+  // เคลียร์ selected/detail เพื่อให้ render สะอาด
+  cache.selectedRecordId = null;
+  cache.openDetail = null;
+
+  // render แต่ละคันแล้วเก็บ HTML
+  const htmlParts = [];
+  for (const t of TRUCKS) {
+    cache.currentPlate = t.plate;
+    renderForPlate(t.plate);
+    htmlParts.push(document.getElementById('content').innerHTML);
+  }
+
+  // inject ทั้งหมดเป็นชุดเดียว
+  document.getElementById('content').innerHTML = htmlParts.join('');
+
+  // รอ layout settle แล้วพิมพ์
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => setTimeout(r, 150));
+  window.print();
+
+  // restore หลัง dialog ปิด
+  setTimeout(() => {
+    cache.currentPlate = originalPlate;
+    cache.selectedRecordId = originalSelected;
+    cache.openDetail = originalDetail;
+    renderForPlate(originalPlate);
+  }, 1500);
+}
+window.printAll = printAll;
 
 function renderWheel(num, tierMap, selected, datesMap) {
   const tier = tierMap[num];
