@@ -240,15 +240,21 @@ function parseWheels(note) {
 }
 
 // แยกประเภทรายการยาง — เปลี่ยน / ปะ / สลับ
-// Heuristic: ใช้ keyword + amount ช่วยเรื่อง "สับเปลี่ยนยางอะไหล่ 400 บ." ที่ถูก match เป็น "เปลี่ยน" ผิด
+// Heuristic priority:
+//   1. ปะ — keyword เฉพาะ
+//   2. สลับ/สับเปลี่ยน + amount ≤ 2000 = swap (กัน "สับเปลี่ยนยางอะไหล่ 400" ติด replace)
+//   3. เปลี่ยน — replacement
+//   4. สลับ (amount สูง) — swap
+//   5. fallback: มีเลขล้อชัด + amount > 3000 → replace (เช่น "ล้อ 31,12" 10,900 ฿)
 function classifyTire(note, amount) {
   const n = (note || '').toLowerCase();
   const amt = Number(amount || 0);
   if (/ปะ/.test(n)) return 'patch';
-  // "สลับ" หรือ "สับเปลี่ยน" + ราคาน้อย (≤ 2000) = ก็แค่ swap/สลับ ไม่ใช่เปลี่ยนจริง
   if (/สลับ|สับเปลี่ยน/.test(n) && amt <= 2000) return 'swap';
   if (/เปลี่ยน/.test(n)) return 'replace';
   if (/สลับ/.test(n))    return 'swap';
+  // Fallback: มี wheel number pattern + ราคาสูง → ถือเป็น replace
+  if ((/\(\s*\d/.test(n) || /ล้อ\s*\d/.test(n)) && amt > 3000) return 'replace';
   return 'other';
 }
 
