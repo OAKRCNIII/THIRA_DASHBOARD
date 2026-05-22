@@ -317,12 +317,13 @@ function renderForPlate(plate) {
   const headHTML = `<div class="head-grid">${HEAD_ROWS.map(renderRow).join('')}</div>`;
   const tailHTML = `<div>${TAIL_ROWS.map(renderRow).join('')}</div>`;
 
-  // History list
+  // History list — เรียง "ใหม่สุดอยู่บน"
   const totalCost = records.reduce((s, r) => s + Number(r.amount || 0), 0);
   const totalWheels = records.reduce((s, r) => s + r.wheels.length, 0);
+  const recordsDesc = [...records].sort((a, b) => b.date.localeCompare(a.date));
   const historyHTML = records.length === 0
     ? '<div class="empty">— ไม่มีประวัติเปลี่ยนยางในปีนี้ —</div>'
-    : records.map(r => `
+    : recordsDesc.map(r => `
         <div class="history-item ${r.id === cache.selectedRecordId ? 'active' : ''}" onclick="selectRecord(${r.id})">
           <div class="date">${fmtThaiDate(r.date)}</div>
           <div class="wheels">🛞 ล้อ ${r.wheels.join(', ')} <span style="font-weight:400;color:#888">(${r.wheels.length} เส้น)</span></div>
@@ -330,6 +331,22 @@ function renderForPlate(plate) {
           <div class="amount">${fmtBaht(r.amount)} บ.</div>
         </div>
       `).join('');
+
+  // Summary on top — บอกว่าคันนี้เปลี่ยนไปกี่เส้น ราคารวม
+  const topSummary = records.length > 0 ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px 12px;border-radius:10px;text-align:center">
+        <div style="font-size:11px;color:#ea580c;font-weight:500">เปลี่ยนไปแล้ว</div>
+        <div class="num" style="font-size:22px;font-weight:700;color:#c2410c">${totalWheels} <small style="font-size:12px;font-weight:500">เส้น</small></div>
+        <div style="font-size:11px;color:#92400e;margin-top:2px">${records.length} ครั้ง</div>
+      </div>
+      <div style="background:#fef2f2;border:1px solid #fecaca;padding:10px 12px;border-radius:10px;text-align:center">
+        <div style="font-size:11px;color:#dc2626;font-weight:500">ค่าใช้จ่ายรวม</div>
+        <div class="num" style="font-size:22px;font-weight:700;color:#991b1b">${fmtBaht(totalCost)}</div>
+        <div style="font-size:11px;color:#7f1d1d;margin-top:2px">บาท</div>
+      </div>
+    </div>
+  ` : '';
 
   const truckInfo = TRUCKS.find(t => t.plate === plate);
   document.getElementById('content').innerHTML = `
@@ -357,13 +374,8 @@ function renderForPlate(plate) {
 
       <div class="card">
         <h2>📋 ประวัติการเปลี่ยน <small style="font-weight:400;color:#888">(คลิกเพื่อ highlight)</small></h2>
+        ${topSummary}
         <div class="history">${historyHTML}</div>
-        ${records.length > 0 ? `
-          <div class="summary">
-            <span>${records.length} ครั้ง • ${totalWheels} เส้น</span>
-            <span>รวม <strong>${fmtBaht(totalCost)}</strong> บ.</span>
-          </div>
-        ` : ''}
       </div>
     </div>
   `;
