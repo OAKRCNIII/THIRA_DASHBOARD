@@ -64,7 +64,8 @@
     content: ''; position: absolute; top: 50%; left: calc(50% - 50px); right: calc(50% - 50px);
     height: 3px; background: #f97316; transform: translateY(-50%); z-index: 0;
   }
-  .row .dual, .row .wheel { position: relative; z-index: 1; }
+  .row .dual, .row .wheel, .row .wheel-wrap { position: relative; z-index: 1; }
+  .row { align-items: flex-start !important; }
 
   /* Vertical connector — only in head section, between rows */
   .head-grid { position: relative; }
@@ -103,6 +104,19 @@
   .wheel.changed.t-3 { background: radial-gradient(circle at 50% 50%, #fbcfe8 0% 38%, #db2777 38% 50%, #1f2937 50% 100%); }
   .wheel.changed.t-4 { background: radial-gradient(circle at 50% 50%, #ddd6fe 0% 38%, #7c3aed 38% 50%, #1f2937 50% 100%); }
   .wheel.changed.t-5 { background: radial-gradient(circle at 50% 50%, #bae6fd 0% 38%, #0284c7 38% 50%, #1f2937 50% 100%); }
+
+  /* Wheel + date label wrapper */
+  .wheel-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 56px; }
+  .wheel-date {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px; font-weight: 600;
+    background: #fef3c7; color: #92400e;
+    padding: 1px 6px; border-radius: 8px;
+    border: 1px solid #fde68a;
+    line-height: 1.2; white-space: nowrap;
+  }
+  .wheel-date.sel { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+  .wheel-date-spacer { height: 16px; }
 
   /* Highlighted */
   .wheel.selected {
@@ -334,8 +348,9 @@ function renderForPlate(plate) {
   const patches = all.filter(r => r.kind === 'patch');
   const swaps   = all.filter(r => r.kind === 'swap');
 
-  // คำนวณ tier (สีของล้อ) ตามลำดับวันที่ — เก่าสุด=0, ใหม่สุด=N
-  const wheelTier = {};   // wheelNum → tier
+  // คำนวณ tier (สีของล้อ) + ดึงวันที่ของแต่ละล้อ
+  const wheelTier = {};      // wheelNum → tier
+  const wheelDates = {};     // wheelNum → [date, date, ...] (sorted ใหม่ก่อน)
   const selected = new Set();
   if (cache.selectedRecordId) {
     const r = all.find(x => x.id === cache.selectedRecordId);
@@ -343,16 +358,20 @@ function renderForPlate(plate) {
   }
   records.forEach((r, idx) => {
     const tier = records.length > 1 ? Math.min(5, Math.floor(idx / (records.length / 6))) : 0;
-    r.wheels.forEach(w => { wheelTier[w] = tier; });
+    r.wheels.forEach(w => {
+      wheelTier[w] = tier;     // override → tier ของวันล่าสุด
+      if (!wheelDates[w]) wheelDates[w] = [];
+      wheelDates[w].push(r.date);
+    });
   });
 
   // Render diagram
   const renderRow = (row) => {
     const cells = row.wheels.map(group => {
       if (group.length === 1) {
-        return renderWheel(group[0], wheelTier, selected);
+        return renderWheel(group[0], wheelTier, selected, wheelDates);
       }
-      return `<div class="dual">${group.map(w => renderWheel(w, wheelTier, selected)).join('')}</div>`;
+      return `<div class="dual">${group.map(w => renderWheel(w, wheelTier, selected, wheelDates)).join('')}</div>`;
     }).join('');
     return `<div class="row ${row.type === 'front' ? 'front' : 'dual-axle'}">${cells}</div>`;
   };
@@ -467,12 +486,24 @@ function renderForPlate(plate) {
   `;
 }
 
-function renderWheel(num, tierMap, selected) {
+function renderWheel(num, tierMap, selected, datesMap) {
   const tier = tierMap[num];
   let cls = 'wheel';
   if (selected.has(num)) cls += ' selected';
   else if (tier !== undefined) cls += ` changed t-${tier}`;
-  return `<div class="${cls}">${num}</div>`;
+  const dates = (datesMap && datesMap[num]) || [];
+  // ถ้ามีวันที่ — แสดง pill สั้นๆ ใต้ล้อ "วัน/เดือน"
+  let dateHTML = '<div class="wheel-date-spacer"></div>';
+  if (dates.length > 0) {
+    const sorted = [...dates].sort((a, b) => b.localeCompare(a));
+    const latest = sorted[0];
+    const [, m, d] = latest.split('-');
+    const label = `${+d}/${+m}` + (sorted.length > 1 ? ` ✦${sorted.length}` : '');
+    const cls2 = selected.has(num) ? 'wheel-date sel' : 'wheel-date';
+    const title = sorted.map(s => { const [y,m,d]=s.split('-'); return `${+d}/${+m}/${+y}`; }).join(' • ');
+    dateHTML = `<div class="${cls2}" title="${title}">${label}</div>`;
+  }
+  return `<div class="wheel-wrap"><div class="${cls}">${num}</div>${dateHTML}</div>`;
 }
 
 // Init
