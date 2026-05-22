@@ -239,6 +239,15 @@ function parseWheels(note) {
   return [...wheels].sort((a,b) => a-b);
 }
 
+// แยกประเภทรายการยาง — เปลี่ยน / ปะ / สลับ
+function classifyTire(note) {
+  const n = (note || '').toLowerCase();
+  if (/เปลี่ยน/.test(n)) return 'replace';   // priority: ถ้ามี "เปลี่ยน" = replacement
+  if (/ปะ/.test(n))      return 'patch';
+  if (/สลับ/.test(n))    return 'swap';
+  return 'other';
+}
+
 async function reload() {
   try {
     setStatus('กำลังโหลดข้อมูลยาง...');
@@ -250,8 +259,11 @@ async function reload() {
       .gte('date', start).lte('date', end)
       .order('date');
     if (error) throw error;
-    // เฉพาะที่ extract ล้อได้
-    cache.tireRecords = (data || []).map(r => ({ ...r, wheels: parseWheels(r.note) }));
+    cache.tireRecords = (data || []).map(r => ({
+      ...r,
+      wheels: parseWheels(r.note),
+      kind: classifyTire(r.note)
+    }));
     setStatus(null);
     renderTabs();
     renderForPlate(cache.currentPlate);
@@ -293,13 +305,19 @@ function selectRecord(id) {
 window.selectRecord = selectRecord;
 
 function renderForPlate(plate) {
-  const records = cache.tireRecords.filter(r => r.truck_plate === plate && r.wheels.length > 0);
+  // ทุก records ของรถนี้
+  const all = cache.tireRecords.filter(r => r.truck_plate === plate);
+  // เฉพาะ "เปลี่ยน" ที่มีเลขล้อ → จะใส่ลง diagram
+  const records = all.filter(r => r.kind === 'replace' && r.wheels.length > 0);
+  // ปะยาง + สลับยาง (ไม่ติด wheel diagram)
+  const patches = all.filter(r => r.kind === 'patch');
+  const swaps   = all.filter(r => r.kind === 'swap');
 
   // คำนวณ tier (สีของล้อ) ตามลำดับวันที่ — เก่าสุด=0, ใหม่สุด=N
   const wheelTier = {};   // wheelNum → tier
   const selected = new Set();
   if (cache.selectedRecordId) {
-    const r = records.find(x => x.id === cache.selectedRecordId);
+    const r = all.find(x => x.id === cache.selectedRecordId);
     if (r) r.wheels.forEach(w => selected.add(w));
   }
   records.forEach((r, idx) => {
@@ -321,34 +339,59 @@ function renderForPlate(plate) {
   const headHTML = `<div class="head-grid">${HEAD_ROWS.map(renderRow).join('')}</div>`;
   const tailHTML = `<div>${TAIL_ROWS.map(renderRow).join('')}</div>`;
 
-  // History list — เรียง "ใหม่สุดอยู่บน"
-  const totalCost = records.reduce((s, r) => s + Number(r.amount || 0), 0);
+  // ── Totals แยกประเภท ──
+  const sumCost = arr => arr.reduce((s, r) => s + Number(r.amount || 0), 0);
   const totalWheels = records.reduce((s, r) => s + r.wheels.length, 0);
-  const recordsDesc = [...records].sort((a, b) => b.date.localeCompare(a.date));
-  const historyHTML = records.length === 0
-    ? '<div class="empty">— ไม่มีประวัติเปลี่ยนยางในปีนี้ —</div>'
-    : recordsDesc.map(r => `
-        <div class="history-item ${r.id === cache.selectedRecordId ? 'active' : ''}" onclick="selectRecord(${r.id})">
-          <div class="date">${fmtThaiDate(r.date)}</div>
-          <div class="wheels">🛞 ล้อ ${r.wheels.join(', ')} <span style="font-weight:400;color:#888">(${r.wheels.length} เส้น)</span></div>
-          <div class="note">${esc(r.note || '—')}</div>
-          <div class="amount">${fmtBaht(r.amount)} บ.</div>
-        </div>
-      `).join('');
+  const replaceCost = sumCost(records);
+  const patchCost   = sumCost(patches);
+  const swapCost    = sumCost(swaps);
+  const grandCost   = replaceCost + patchCost + swapCost;
 
-  // Summary on top — บอกว่าคันนี้เปลี่ยนไปกี่เส้น ราคารวม
-  const topSummary = records.length > 0 ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px 12px;border-radius:10px;text-align:center">
-        <div style="font-size:11px;color:#ea580c;font-weight:500">เปลี่ยนไปแล้ว</div>
-        <div class="num" style="font-size:22px;font-weight:700;color:#c2410c">${totalWheels} <small style="font-size:12px;font-weight:500">เส้น</small></div>
-        <div style="font-size:11px;color:#92400e;margin-top:2px">${records.length} ครั้ง</div>
+  // History list — รวมทุกประเภท, ใหม่สุดบน
+  const allDesc = [...all].sort((a, b) => b.date.localeCompare(a.date));
+  const kindBadge = (kind) => {
+    if (kind === 'replace') return '<span style="background:#fed7aa;color:#7c2d12;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">🔄 เปลี่ยน</span>';
+    if (kind === 'patch')   return '<span style="background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">🩹 ปะ</span>';
+    if (kind === 'swap')    return '<span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">↔ สลับ</span>';
+    return '<span style="background:#f3f4f6;color:#374151;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">อื่นๆ</span>';
+  };
+  const historyHTML = all.length === 0
+    ? '<div class="empty">— ไม่มีประวัติเปลี่ยน/ปะยางในปีนี้ —</div>'
+    : allDesc.map(r => {
+        const wheelTxt = r.wheels.length > 0
+          ? `🛞 ล้อ ${r.wheels.join(', ')} <span style="font-weight:400;color:#888">(${r.wheels.length} เส้น)</span>`
+          : '<span style="color:#888">—</span>';
+        const clickable = r.kind === 'replace' && r.wheels.length > 0;
+        return `
+          <div class="history-item ${r.id === cache.selectedRecordId ? 'active' : ''}" ${clickable ? `onclick="selectRecord(${r.id})"` : 'style="cursor:default"'}>
+            <div class="date">${fmtThaiDate(r.date)} ${kindBadge(r.kind)}</div>
+            <div class="wheels">${wheelTxt}</div>
+            <div class="note">${esc(r.note || '—')}</div>
+            <div class="amount">${fmtBaht(r.amount)} บ.</div>
+          </div>`;
+      }).join('');
+
+  // Summary on top — 3 ช่อง: เปลี่ยน / ปะ / สลับ + กรอบรวม
+  const topSummary = all.length > 0 ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+      <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:#ea580c;font-weight:500">🔄 เปลี่ยน</div>
+        <div class="num" style="font-size:18px;font-weight:700;color:#c2410c">${totalWheels} <small style="font-size:11px;font-weight:500">เส้น</small></div>
+        <div style="font-size:10px;color:#92400e">${records.length} ครั้ง • ${fmtBaht(replaceCost)} ฿</div>
       </div>
-      <div style="background:#fef2f2;border:1px solid #fecaca;padding:10px 12px;border-radius:10px;text-align:center">
-        <div style="font-size:11px;color:#dc2626;font-weight:500">ค่าใช้จ่ายรวม</div>
-        <div class="num" style="font-size:22px;font-weight:700;color:#991b1b">${fmtBaht(totalCost)}</div>
-        <div style="font-size:11px;color:#7f1d1d;margin-top:2px">บาท</div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px;border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:#2563eb;font-weight:500">🩹 ปะยาง</div>
+        <div class="num" style="font-size:18px;font-weight:700;color:#1e40af">${patches.length}</div>
+        <div style="font-size:10px;color:#1e3a8a">ครั้ง • ${fmtBaht(patchCost)} ฿</div>
       </div>
+      <div style="background:#eef2ff;border:1px solid #c7d2fe;padding:10px;border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:#4f46e5;font-weight:500">↔ สลับ</div>
+        <div class="num" style="font-size:18px;font-weight:700;color:#3730a3">${swaps.length}</div>
+        <div style="font-size:10px;color:#312e81">ครั้ง • ${fmtBaht(swapCost)} ฿</div>
+      </div>
+    </div>
+    <div style="background:#1e3a5f;color:white;padding:8px 14px;border-radius:8px;text-align:right;font-size:13px;margin-bottom:14px">
+      ค่าใช้จ่ายยางทั้งปี: <strong class="num" style="font-size:16px">${fmtBaht(grandCost)} บ.</strong>
     </div>
   ` : '';
 
