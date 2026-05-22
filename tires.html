@@ -39,71 +39,109 @@
   .card { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
   .card h2 { font-size: 14px; color: #6b7280; margin-bottom: 14px; font-weight: 600; }
 
-  /* Wheel layout */
-  .section { margin-bottom: 28px; }
-  .section-title { text-align: center; font-size: 16px; font-weight: 600; color: #1e3a5f; margin-bottom: 14px; }
-
-  .row { display: flex; justify-content: center; align-items: center; gap: 4px; margin-bottom: 8px; position: relative; }
-  .axle-line {
-    position: absolute; left: 50%; right: 50%; top: 50%;
-    height: 4px; background: #f97316; transform: translate(-50%, -50%);
+  /* ─── Truck diagram container ─── */
+  .truck-body {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 2px solid #cbd5e1; border-radius: 24px;
+    padding: 24px 16px 28px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .truck-body::before {
+    content: attr(data-title);
+    position: absolute; top: -10px; left: 24px;
+    background: white; padding: 2px 12px;
+    border: 1px solid #cbd5e1; border-radius: 20px;
+    font-size: 12px; font-weight: 600; color: #475569;
   }
 
+  .row { display: flex; justify-content: center; align-items: flex-start; gap: 4px; margin-bottom: 16px; position: relative; }
   /* Front single axle: 1, 2 — narrow gap */
-  .row.front { gap: 80px; padding: 0 calc(50% - 80px); }
+  .row.front { gap: 90px; }
   /* Drive/trailer with dual: outer + inner per side, gap in middle */
-  .row.dual-axle { gap: 60px; }
-  .dual { display: flex; gap: 2px; }
+  .row.dual-axle { gap: 56px; }
+  .dual { display: flex; gap: 3px; }
 
-  /* Connector line below axle */
-  .row.dual-axle::before {
-    content: ''; position: absolute; top: 50%; left: calc(50% - 50px); right: calc(50% - 50px);
-    height: 3px; background: #f97316; transform: translateY(-50%); z-index: 0;
-  }
-  .row.front::before {
-    content: ''; position: absolute; top: 50%; left: calc(50% - 50px); right: calc(50% - 50px);
-    height: 3px; background: #f97316; transform: translateY(-50%); z-index: 0;
-  }
-  .row .dual, .row .wheel { position: relative; z-index: 1; }
-
-  /* Vertical connector — only in head section, between rows */
-  .head-grid { position: relative; }
-  .head-grid::before {
-    content: ''; position: absolute; top: 35px; bottom: 35px;
-    left: 50%; width: 3px; background: #f97316; transform: translateX(-50%);
+  /* Axle connector — orange chassis-like line */
+  .row.dual-axle::before, .row.front::before {
+    content: ''; position: absolute; top: 32px; left: calc(50% - 60px); right: calc(50% - 60px);
+    height: 5px;
+    background: linear-gradient(90deg, #ea580c 0%, #f97316 50%, #ea580c 100%);
+    border-radius: 3px;
     z-index: 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
-  .head-grid .row { z-index: 1; }
+  .row .dual, .row .wheel-pos { position: relative; z-index: 1; }
 
-  /* Wheel circle */
+  /* Head-section vertical spine */
+  .head-grid { position: relative; padding: 8px 0; }
+  .head-grid::before {
+    content: ''; position: absolute; top: 32px; bottom: 64px;
+    left: 50%; width: 5px;
+    background: linear-gradient(180deg, #ea580c 0%, #f97316 50%, #ea580c 100%);
+    border-radius: 3px;
+    transform: translateX(-50%); z-index: 0;
+    box-shadow: 0 0 4px rgba(234,88,12,0.2);
+  }
+
+  /* Wheel position wrapper — wheel + date label */
+  .wheel-pos {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    min-width: 64px;
+  }
+
+  /* Wheel — circle with depth */
   .wheel {
-    width: 52px; height: 52px; border-radius: 50%;
-    border: 2px solid #16a34a; background: white;
+    width: 64px; height: 64px; border-radius: 50%;
+    border: 3px solid #94a3b8;
+    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f1f5f9 60%, #cbd5e1 100%);
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; color: #222;
+    font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700; color: #475569;
     transition: all 0.2s;
     cursor: default;
+    box-shadow:
+      0 2px 4px rgba(0,0,0,0.08),
+      inset 0 0 0 4px white,
+      inset 0 0 0 6px #cbd5e1;
   }
-  /* Changed wheel — colored by date order (oldest → newest) */
-  .wheel.changed {
-    border-width: 3px;
-    box-shadow: 0 0 0 2px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.1);
-  }
-  .wheel.changed.t-0 { background: #fef9c3; border-color: #eab308; }   /* oldest */
-  .wheel.changed.t-1 { background: #fed7aa; border-color: #ea580c; }
-  .wheel.changed.t-2 { background: #fecaca; border-color: #dc2626; }
-  .wheel.changed.t-3 { background: #fbcfe8; border-color: #db2777; }
-  .wheel.changed.t-4 { background: #ddd6fe; border-color: #7c3aed; }
-  .wheel.changed.t-5 { background: #bae6fd; border-color: #0284c7; }   /* newest */
 
-  /* Highlighted (selected history) */
+  /* Changed wheel — colored fill + ring */
+  .wheel.changed {
+    border-color: #c2410c;
+    background: radial-gradient(circle at 30% 30%, #fff7ed 0%, #fed7aa 60%, #fb923c 100%);
+    color: #7c2d12;
+    box-shadow:
+      0 4px 10px rgba(234,88,12,0.25),
+      inset 0 0 0 4px #fff7ed,
+      inset 0 0 0 6px #fb923c;
+  }
+
+  /* Date label below wheel */
+  .wheel-date {
+    background: #fef3c7; color: #92400e;
+    font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
+    padding: 2px 6px; border-radius: 8px;
+    border: 1px solid #fde68a;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  .wheel-date.multi { background: #fce7f3; color: #9d174d; border-color: #f9a8d4; }
+  .wheel-spacer { height: 18px; }  /* keep height aligned when no date */
+
+  /* Selected — pulse highlight */
   .wheel.selected {
     border-color: #dc2626 !important;
-    border-width: 4px;
-    background: #fef2f2 !important;
-    color: #dc2626;
-    box-shadow: 0 0 0 4px rgba(220,38,38,0.2), 0 4px 12px rgba(220,38,38,0.3);
+    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #fee2e2 60%, #ef4444 100%) !important;
+    color: #7f1d1d !important;
+    box-shadow:
+      0 0 0 4px rgba(220,38,38,0.25),
+      0 6px 16px rgba(220,38,38,0.4),
+      inset 0 0 0 4px #fee2e2,
+      inset 0 0 0 6px #ef4444 !important;
     animation: pulse 1.5s ease-in-out infinite;
+  }
+  .wheel-date.selected-date {
+    background: #fef2f2; color: #991b1b; border-color: #fca5a5; font-weight: 700;
   }
   @keyframes pulse {
     0%, 100% { transform: scale(1); }
@@ -285,35 +323,38 @@ window.selectRecord = selectRecord;
 function renderForPlate(plate) {
   const records = cache.tireRecords.filter(r => r.truck_plate === plate && r.wheels.length > 0);
 
-  // คำนวณ tier (สีของล้อ) ตามลำดับวันที่ — เก่าสุด=0, ใหม่สุด=N
-  const wheelTier = {};   // wheelNum → tier
+  // wheelDates: wheelNum → [{date, id}, ...]  ใส่ทุก record ที่ wheel นั้นถูกเปลี่ยน
+  const wheelDates = {};
   const selected = new Set();
   if (cache.selectedRecordId) {
     const r = records.find(x => x.id === cache.selectedRecordId);
     if (r) r.wheels.forEach(w => selected.add(w));
   }
-  records.forEach((r, idx) => {
-    const tier = records.length > 1 ? Math.min(5, Math.floor(idx / (records.length / 6))) : 0;
-    r.wheels.forEach(w => { wheelTier[w] = tier; });
+  records.forEach(r => {
+    r.wheels.forEach(w => {
+      if (!wheelDates[w]) wheelDates[w] = [];
+      wheelDates[w].push({ date: r.date, id: r.id });
+    });
   });
 
   // Render diagram
   const renderRow = (row) => {
     const cells = row.wheels.map(group => {
       if (group.length === 1) {
-        return renderWheel(group[0], wheelTier, selected);
+        return renderWheel(group[0], wheelDates, selected);
       }
-      return `<div class="dual">${group.map(w => renderWheel(w, wheelTier, selected)).join('')}</div>`;
+      return `<div class="dual">${group.map(w => renderWheel(w, wheelDates, selected)).join('')}</div>`;
     }).join('');
     return `<div class="row ${row.type === 'front' ? 'front' : 'dual-axle'}">${cells}</div>`;
   };
 
-  const headHTML = `<div class="head-grid">${HEAD_ROWS.map(renderRow).join('')}</div>`;
-  const tailHTML = `<div>${TAIL_ROWS.map(renderRow).join('')}</div>`;
+  const headHTML = `<div class="truck-body" data-title="🚛 หัวลาก"><div class="head-grid">${HEAD_ROWS.map(renderRow).join('')}</div></div>`;
+  const tailHTML = `<div class="truck-body" data-title="📦 หางพ่วง">${TAIL_ROWS.map(renderRow).join('')}</div>`;
 
   // History list
   const totalCost = records.reduce((s, r) => s + Number(r.amount || 0), 0);
   const totalWheels = records.reduce((s, r) => s + r.wheels.length, 0);
+  const uniqueWheels = Object.keys(wheelDates).length;
   const historyHTML = records.length === 0
     ? '<div class="empty">— ไม่มีประวัติเปลี่ยนยางในปีนี้ —</div>'
     : records.map(r => `
@@ -326,31 +367,46 @@ function renderForPlate(plate) {
       `).join('');
 
   const truckInfo = TRUCKS.find(t => t.plate === plate);
+
+  // Stats top bar
+  const latestDate = records.length > 0 ? records[records.length - 1].date : null;
+  const statsHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:10px 12px;border-radius:10px">
+        <div style="font-size:11px;color:#16a34a;font-weight:500">ล้อทั้งหมด</div>
+        <div class="num" style="font-size:22px;font-weight:700;color:#15803d">22</div>
+      </div>
+      <div style="background:#fff7ed;border:1px solid #fed7aa;padding:10px 12px;border-radius:10px">
+        <div style="font-size:11px;color:#ea580c;font-weight:500">เปลี่ยนแล้ว</div>
+        <div class="num" style="font-size:22px;font-weight:700;color:#c2410c">${uniqueWheels} <small style="font-size:12px;font-weight:500">เส้น</small></div>
+      </div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 12px;border-radius:10px">
+        <div style="font-size:11px;color:#2563eb;font-weight:500">ครั้งล่าสุด</div>
+        <div class="num" style="font-size:18px;font-weight:700;color:#1e40af">${latestDate ? fmtThaiDate(latestDate) : '—'}</div>
+      </div>
+      <div style="background:#fef2f2;border:1px solid #fecaca;padding:10px 12px;border-radius:10px">
+        <div style="font-size:11px;color:#dc2626;font-weight:500">ค่าใช้จ่ายปี</div>
+        <div class="num" style="font-size:18px;font-weight:700;color:#991b1b">${fmtBaht(totalCost)} ฿</div>
+      </div>
+    </div>
+  `;
+
   document.getElementById('content').innerHTML = `
     <div class="layout">
       <div class="card">
         <h2>🚛 ${plate} — ${esc(truckInfo?.driver || '')}</h2>
-
-        <div class="section">
-          <div class="section-title">ส่วนหัว</div>
-          ${headHTML}
-        </div>
-
-        <div class="section">
-          <div class="section-title">ส่วนหาง</div>
-          ${tailHTML}
-        </div>
-
+        ${statsHTML}
+        ${headHTML}
+        ${tailHTML}
         <div class="legend">
-          <span class="legend-item"><span class="legend-dot" style="border-color:#16a34a"></span>ปกติ</span>
-          <span class="legend-item"><span class="legend-dot" style="border-color:#eab308;background:#fef9c3"></span>เปลี่ยนนานสุด</span>
-          <span class="legend-item"><span class="legend-dot" style="border-color:#0284c7;background:#bae6fd"></span>เปลี่ยนล่าสุด</span>
-          <span class="legend-item"><span class="legend-dot" style="border-color:#dc2626;background:#fef2f2"></span>ที่เลือก</span>
+          <span class="legend-item"><span class="legend-dot" style="border-color:#94a3b8;background:#f1f5f9"></span>ปกติ</span>
+          <span class="legend-item"><span class="legend-dot" style="border-color:#c2410c;background:#fed7aa"></span>เปลี่ยนแล้วในปีนี้</span>
+          <span class="legend-item"><span class="legend-dot" style="border-color:#dc2626;background:#fee2e2"></span>ที่กำลังเลือก</span>
         </div>
       </div>
 
       <div class="card">
-        <h2>📋 ประวัติการเปลี่ยน <small style="font-weight:400;color:#888">(คลิกเพื่อ highlight)</small></h2>
+        <h2>📋 ประวัติเปลี่ยน <small style="font-weight:400;color:#888">(คลิกเพื่อ highlight)</small></h2>
         <div class="history">${historyHTML}</div>
         ${records.length > 0 ? `
           <div class="summary">
@@ -363,12 +419,31 @@ function renderForPlate(plate) {
   `;
 }
 
-function renderWheel(num, tierMap, selected) {
-  const tier = tierMap[num];
-  let cls = 'wheel';
-  if (selected.has(num)) cls += ' selected';
-  else if (tier !== undefined) cls += ` changed t-${tier}`;
-  return `<div class="${cls}">${num}</div>`;
+/**
+ * Render wheel — circle + optional date pill below
+ * dates: [{date, id}, ...] — sorted by date
+ */
+function renderWheel(num, datesMap, selected) {
+  const dates = datesMap[num] || [];
+  const isSelected = selected.has(num);
+  const wheelCls = isSelected ? 'wheel selected' : (dates.length ? 'wheel changed' : 'wheel');
+
+  if (dates.length === 0) {
+    return `<div class="wheel-pos"><div class="${wheelCls}">${num}</div><div class="wheel-spacer"></div></div>`;
+  }
+
+  // Date pill — แสดงวันล่าสุด, ถ้ามีหลายครั้งใส่ดอกจัน
+  const sorted = [...dates].sort((a, b) => b.date.localeCompare(a.date));
+  const latest = sorted[0];
+  const [y, m, d] = latest.date.split('-');
+  const dateStr = `${+d}/${+m}` + (sorted.length > 1 ? ` ✦${sorted.length}` : '');
+  const dateCls = isSelected ? 'wheel-date selected-date' : (sorted.length > 1 ? 'wheel-date multi' : 'wheel-date');
+  const title = sorted.map(s => fmtThaiDate(s.date)).join(' • ');
+
+  return `<div class="wheel-pos">
+    <div class="${wheelCls}">${num}</div>
+    <div class="${dateCls}" title="${title}">${dateStr}</div>
+  </div>`;
 }
 
 // Init
