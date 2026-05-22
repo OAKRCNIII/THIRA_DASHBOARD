@@ -213,9 +213,10 @@ let cache = { tireRecords: [], currentPlate: TRUCKS[0].plate, selectedRecordId: 
 
 /**
  * Extract wheel numbers from note text
- *   "(5,6,7,8)"     → [5,6,7,8]
- *   "ล้อ 5,6"        → [5,6]
- *   "(5,6) + สลับ" → [5,6]
+ *   "(5,6,7,8)"            → [5,6,7,8]
+ *   "ล้อ 5,6"               → [5,6]
+ *   "ล้อหน้า" / "ยางหน้า"   → [1,2]   (front steering axle)
+ *   "(5,6) + สลับ"         → [5,6]
  */
 function parseWheels(note) {
   if (!note) return [];
@@ -226,12 +227,15 @@ function parseWheels(note) {
     const nums = m[1].match(/\d+/g);
     if (nums) nums.forEach(n => { const x = +n; if (ALL_WHEELS.has(x)) wheels.add(x); });
   }
-  // จับ "ล้อ N, N" หรือ "ล้อ N"
-  const direct = note.matchAll(/ล้อ\s*(\d+(?:\s*,\s*\d+)*)/g);
+  // จับ "ล้อ N, N" หรือ "ล้อ N"  (ไม่จับ "ล้อหน้า" / "ล้อจักร" — เพราะตาม text)
+  const direct = note.matchAll(/ล้อ\s*(\d[\d\s,]*)/g);
   for (const m of direct) {
     const nums = m[1].match(/\d+/g);
     if (nums) nums.forEach(n => { const x = +n; if (ALL_WHEELS.has(x)) wheels.add(x); });
   }
+  // คำกำกวมเฉพาะที่ตรงตัว: "ล้อหน้า" / "ยางหน้า" / "ล้อจักร" / "ยางจักร"
+  // — "หน้า" = front axle = 1, 2 (ไม่กำกวมเพราะมีคู่เดียว)
+  if (/(ล้อ|ยาง)หน้า/.test(note)) { wheels.add(1); wheels.add(2); }
   return [...wheels].sort((a,b) => a-b);
 }
 
