@@ -268,10 +268,9 @@ function parseWheels(note) {
   for (const m of note.matchAll(/\(([^)]+)\)/g)) addNums(m[1]);
   // 2. จับ "ล้อ N, N" หรือ "ล้อ N"  (ไม่จับ "ล้อหน้า" — handled below)
   for (const m of note.matchAll(/ล้อ\s*(\d[\d\s,]*)/g)) addNums(m[1]);
-  // 3. จับ "ยาง N, N" หรือ "เปลี่ยนยาง N,N"  (เช่น "เปลี่ยนยาง 21,22")
-  //    NOT จับ "ยาง 2 ล้อหน้า" (มี "ล้อ" ตามหลัง — handle ด้านล่าง)
-  //    NOT จับ "ยาง 4 เส้น" (มี "เส้น" ตามหลัง — เป็นจำนวน)
-  for (const m of note.matchAll(/ยาง\s*(\d[\d\s,]*?)(?=\s*(?:ล้อ|เส้น|$|[^\d,\s]))/g)) addNums(m[1]);
+  // 3. จับ "ยาง N,N" หลังคำว่ายาง — ต้องมี comma อย่างน้อย 1 ตัว
+  //    (เพราะ "ยาง 6 เส้น" / "ยาง 2 ล้อหน้า" — เลขเดียวคือจำนวน ไม่ใช่เลขล้อ)
+  for (const m of note.matchAll(/ยาง\s+(\d+\s*,\s*\d+(?:\s*,\s*\d+)*)/g)) addNums(m[1]);
   // 4. "ล้อหน้า" / "ยางหน้า" = front axle = 1, 2
   if (/(ล้อ|ยาง)หน้า/.test(note)) { wheels.add(1); wheels.add(2); }
   return [...wheels].sort((a,b) => a-b);
