@@ -557,6 +557,10 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
 
 🗓️ กฎเรื่องวันที่ — สำคัญที่สุด (อ่านช้าๆ ระวัง):
 
+💡 หลักการสำคัญ: บิลที่ส่งมา **ส่วนมากเป็นวันนี้หรือเมื่อวาน** (${today} หรือใกล้เคียง)
+   ถ้าได้วันที่ห่างจาก ${today} เกิน 7 วัน → สงสัยทันทีว่าอ่านผิด!
+   อย่าเดือนผิด เช่น 25/5 ห้ามอ่านเป็น 25/9, 29/9 ฯลฯ
+
 ขั้นที่ 1: หา "ช่อง DATE" ในบิลก่อน (ป้ายภาษาไทย/อังกฤษ: "วันที่", "DATE:", "Date:")
 ขั้นที่ 2: อ่าน 3 ตัวเลขที่อยู่ในช่อง DATE → DD MM YY (วัน เดือน ปี)
    เช่น "20 05 69" หรือ "20/05/69" หรือ "20-5-69"
@@ -566,13 +570,19 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
    - ปี 2 หลัก "${currentYear % 100}" → ค.ศ. ${currentYear} โดยตรง
    - ปี 4 หลัก > 2500 = พ.ศ. → ลบ 543
    - ปี 4 หลัก < 2500 = ค.ศ. ใช้ตามนั้น
+ขั้นที่ 4: ✅ Validate — เทียบกับ ${today}:
+   - ถ้าได้วันที่ → "ห่างกัน ≤ 7 วัน" = ปกติ ใช้ค่านี้
+   - ถ้าได้วันที่ → "ห่างกัน > 7 วัน" = อาจอ่านผิด — ลองอ่านใหม่อย่างระมัดระวัง
+   - ถ้าได้วันที่ → "เป็นอนาคต > 1 วัน" = ผิดแน่ — บิลไม่ลงอนาคต
+   - ถ้าอ่านไม่ได้แน่ๆ → ใช้ null (ระบบจะ default เป็น ${today})
 
 ❌ ห้ามทำผิดเหล่านี้:
    - ห้ามดึงตัวเลขจาก BILL NO หรือ เลขประจำตัวประชาชน หรือยอดเงิน มาเป็นวันที่
    - ห้ามกลับ DD กับ MM (วันก่อนเดือน เสมอ ในรูปแบบไทย)
+   - ห้ามอ่านเดือนผิด (5 vs 9, 6 vs 9) — ดูตำแหน่งช่องเดือนชัดเจน
    - ห้ามคำนวณ/เดาวันที่ — ใช้ตัวเลขที่เห็นในช่อง DATE ตรงๆ
 
-⚠️ Sanity check: ผลลัพธ์ต้องอยู่ใน ±60 วันจาก ${today}
+⚠️ Sanity check: ผลลัพธ์ควรอยู่ใน ±7 วันจาก ${today} (บิลปกติเขียนเมื่อจ่าย)
    ถ้าออกนอกช่วงนี้ → อ่านผิดแน่นอน, ลองอ่านเลขใหม่อย่างระมัดระวัง
 
 💰 amount = "ยอดเงินสุทธิที่จ่ายจริง":
@@ -656,18 +666,25 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
       }
     }
   }
-  // Safety net: date sanity check (±60 days from today)
+  // Safety net: date sanity check — บิลส่วนมากเป็นวันนี้/เมื่อวาน
+  // ถ้าห่างจากวันนี้เกิน 7 วัน หรือเป็นอนาคต > 1 วัน → ถือว่าอ่านผิด
   if (parsed.date) {
     const dt = new Date(parsed.date).getTime();
     const now = Date.now();
-    const SIXTY_DAYS = 60 * 86400 * 1000;
-    if (Math.abs(now - dt) > SIXTY_DAYS) {
-      // ปีน่าจะอ่านผิด — แทนที่ปีด้วยปีปัจจุบัน
-      const today = new Date();
-      const [yy, mm, dd] = parsed.date.split("-");
-      parsed.date = `${today.getFullYear()}-${mm}-${dd}`;
-      console.warn(`[OCR] date ${yy}-${mm}-${dd} ออกนอกช่วง ±60 วัน → แก้ปีเป็น ${today.getFullYear()}`);
+    const SEVEN_DAYS = 7 * 86400 * 1000;
+    const ONE_DAY = 86400 * 1000;
+    const diff = now - dt;                    // positive = past, negative = future
+    const inPast7d = diff >= 0 && diff <= SEVEN_DAYS;
+    const inFuture1d = diff < 0 && -diff <= ONE_DAY;
+    if (!inPast7d && !inFuture1d) {
+      // ออกนอกช่วง → default to today (ปลอดภัยกว่าเดาผิด)
+      const today = new Date().toISOString().slice(0, 10);
+      console.warn(`[OCR] date ${parsed.date} ออกนอกช่วง (±7 วัน) → default to ${today}`);
+      parsed.date = today;
     }
+  } else {
+    // ไม่ได้วันที่เลย → default เป็นวันนี้ (ส่วนใหญ่บิลเป็นวันนี้)
+    parsed.date = new Date().toISOString().slice(0, 10);
   }
   return parsed;
 }
