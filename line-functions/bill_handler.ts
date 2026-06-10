@@ -123,7 +123,7 @@ export async function handleImageMessage(
     } else {
       await sendLinePush(userId, [{
         type: "text",
-        text: `📋 อ่านบิลได้:\n• วันที่: ${parsed.date || '—'}\n• ประเภท: ${parsed.category || '—'}\n• ยอด: ${fmtBaht(parsed.amount)}${parsed.liters ? `\n• ลิตร: ${parsed.liters}` : ''}${isFuelLimitSlip ? '\n• ⚠️ ใบจำกัด — รอ user เลือกรถ + ใส่ราคา/ลิตร' : ''}\n\n👉 บิลนี้เป็นของรถคันไหน? (🌐 รวมฝูง = ค่าใช้จ่ายส่วนรวม XX-XXXX)`,
+        text: `📋 อ่านบิลได้:\n• วันที่: ${parsed.date || '—'}\n• ประเภท: ${parsed.category || '—'}\n• ยอด: ${fmtBaht(parsed.amount)}${parsed.liters ? `\n• ลิตร: ${parsed.liters}` : ''}${isFuelLimitSlip ? '\n• ⛽ บิลน้ำมัน — รอเลือกรถ + ใส่ราคา/ลิตร' : ''}\n\n👉 บิลนี้เป็นของรถคันไหน? (🌐 รวมฝูง = ค่าใช้จ่ายส่วนรวม XX-XXXX)`,
         quickReply: {
           items: [
             ...truckQuickReplyItems(),
@@ -275,7 +275,7 @@ export async function tryHandleFuelRate(
 function askFuelRate(plate: string, liters: number): any {
   return {
     type: "text",
-    text: `🎫 ใบจำกัดน้ำมัน ${plate} • ${liters} ลิตร\n👉 ลิตรละกี่บาท?\n\nพิมพ์ตอบ เช่น "41.50" หรือกดปุ่ม↓`,
+    text: `⛽ น้ำมัน ${plate} • ${liters} ลิตร\n👉 ลิตรละกี่บาท?\n\nพิมพ์ตอบ เช่น "41.50" หรือกดปุ่ม↓`,
     quickReply: fuelRateQuickReply()
   };
 }
@@ -645,14 +645,15 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
        → liters = ตัวเลขที่อยู่ก่อนเครื่องหมาย × (multiplied)
        → amount = ผลลัพธ์รวม (TOTAL/รวม)
 
-     🎫 รูปแบบ "ใบจำกัด/อนุมัติน้ำมัน" (สีเหลือง มี No. แดงด้านบน):
-       มีช่อง DATE, NAME (TR), CAR No., LIMIT (ลิตร)
-       เช่น: DATE 10 JUN 2026, CAR No. ฮ-9538, LIMIT 395
-       → plate = "71-9538" (จาก CAR No.)
+     🎫 รูปแบบ "ใบเสร็จปั๊มท้องถิ่น" (กระดาษสีเหลือง มี No. แดงด้านบน):
+       ปั๊มเล็กออกบิลแบบนี้ — มีแค่ "ลิตร" ไม่มีราคา (ตกลงราคากันแยก)
+       มีช่อง DATE, NAME (TR), CAR No., LIMIT (= ลิตรที่เติม)
+       เช่น: DATE 10 JUN 2026, CAR No. 71-9538, LIMIT 395
+       → plate = "71-9538" (จาก CAR No. — ดูตัวเลขทะเบียนให้ดี ไม่ใช่ลายเซ็น)
        → liters = ตัวเลขในช่อง LIMIT (เช่น 395)
-       → amount = null  (ใบนี้ไม่มีราคา — บอทจะถามทีหลัง)
+       → amount = null  (ใบไม่มีราคา — บอทจะถามราคา/ลิตรหลังจากนี้)
        → category = "ค่าน้ำมัน"
-       → note = "เติมน้ำมัน (ใบจำกัด No. XXXX)" ถ้าเห็น No.
+       → note = "เติมน้ำมัน (No. XXXX)" ถ้าเห็น No.
 
   ⚡ Priority 3: ผ่านด่าน
      "ผ่านด่าน", "ทางด่วน", "Toll", "EXAT", "ETC"
