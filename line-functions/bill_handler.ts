@@ -81,10 +81,25 @@ export async function handleImageMessage(
       autoPlate = "XX-XXXX";
     }
 
+    // ── ตรวจว่าเป็น "ใบจำกัด/อนุมัติน้ำมัน" หรือไม่ ──
+    // เกณฑ์: category=ค่าน้ำมัน + มี liters แต่ amount=null → ต้องถามราคา/ลิตร
+    const isFuelLimitSlip =
+      parsed.category === "ค่าน้ำมัน" &&
+      parsed.liters && parsed.liters > 0 &&
+      (parsed.amount == null || parsed.amount <= 0);
+
+    // ตัดสินใจ status ตอนแรก:
+    //   - ต้องมีรถก่อน → ไม่มีรถ = awaiting_truck
+    //   - ใบจำกัด + รู้รถแล้ว = awaiting_fuel_rate (ขอราคา/ลิตร)
+    //   - ปกติ + รู้รถแล้ว = awaiting_confirm
+    const initialStatus = !autoPlate
+      ? "awaiting_truck"
+      : (isFuelLimitSlip ? "awaiting_fuel_rate" : "awaiting_confirm");
+
     const { data: pending, error } = await sb
       .schema("thira").from("line_pending_bills").insert({
         line_user_id: userId,
-        status: autoPlate ? "awaiting_confirm" : "awaiting_truck",
+        status: initialStatus,
         kind: "outcome",
         truck_plate: autoPlate,
         date: parsed.date,
@@ -97,7 +112,10 @@ export async function handleImageMessage(
       }).select().single();
     if (error) throw error;
 
-    if (autoPlate) {
+    if (initialStatus === "awaiting_fuel_rate") {
+      // มีรถแล้ว + เป็นใบจำกัด → ถามราคา/ลิตรเลย
+      await sendLinePush(userId, [askFuelRate(autoPlate!, parsed.liters!)]);
+    } else if (autoPlate) {
       await sendLinePush(userId, [
         { type: "text", text: `✓ อ่านบิลได้ (อ่านทะเบียน ${autoPlate} จากบิล)` },
         buildConfirmFlex({ ...pending, truck_plate: autoPlate })
@@ -105,7 +123,7 @@ export async function handleImageMessage(
     } else {
       await sendLinePush(userId, [{
         type: "text",
-        text: `📋 อ่านบิลได้:\n• วันที่: ${parsed.date || '—'}\n• ประเภท: ${parsed.category || '—'}\n• ยอด: ${fmtBaht(parsed.amount)}${parsed.liters ? `\n• ลิตร: ${parsed.liters}` : ''}\n\n👉 บิลนี้เป็นของรถคันไหน? (🌐 รวมฝูง = ค่าใช้จ่ายส่วนรวม XX-XXXX)`,
+        text: `📋 อ่านบิลได้:\n• วันที่: ${parsed.date || '—'}\n• ประเภท: ${parsed.category || '—'}\n• ยอด: ${fmtBaht(parsed.amount)}${parsed.liters ? `\n• ลิตร: ${parsed.liters}` : ''}${isFuelLimitSlip ? '\n• ⚠️ ใบจำกัด — รอ user เลือกรถ + ใส่ราคา/ลิตร' : ''}\n\n👉 บิลนี้เป็นของรถคันไหน? (🌐 รวมฝูง = ค่าใช้จ่ายส่วนรวม XX-XXXX)`,
         quickReply: {
           items: [
             ...truckQuickReplyItems(),
@@ -181,11 +199,99 @@ export async function tryHandleTruckSelection(
     return true;
   }
 
+  // ถ้าเป็น "ใบจำกัด" (ค่าน้ำมัน มี liters แต่ amount=null) → ขอราคา/ลิตรต่อ
+  const isFuelLimitSlip =
+    pending.category === "ค่าน้ำมัน" &&
+    pending.liters && Number(pending.liters) > 0 &&
+    (pending.amount == null || Number(pending.amount) <= 0);
+
+  if (isFuelLimitSlip) {
+    await sb.schema("thira").from("line_pending_bills").update({
+      truck_plate: plate, status: "awaiting_fuel_rate", updated_at: new Date().toISOString()
+    }).eq("id", pending.id);
+    await reply([askFuelRate(plate, Number(pending.liters))]);
+    return true;
+  }
+
   await sb.schema("thira").from("line_pending_bills").update({
     truck_plate: plate, status: "awaiting_confirm", updated_at: new Date().toISOString()
   }).eq("id", pending.id);
   await reply([buildConfirmFlex({ ...pending, truck_plate: plate })]);
   return true;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Step 2b: รับราคา/ลิตร สำหรับใบจำกัด → คำนวณ amount → ขอ confirm
+// ════════════════════════════════════════════════════════════════════
+export async function tryHandleFuelRate(
+  userId: string,
+  text: string,
+  reply: (msgs: any[]) => Promise<void>
+): Promise<boolean> {
+  const { data: pending } = await sb
+    .schema("thira").from("line_pending_bills")
+    .select("*").eq("line_user_id", userId)
+    .eq("status", "awaiting_fuel_rate")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!pending) return false;
+
+  // ยกเลิก?
+  if (text === "/ยกเลิกบิล" || text.toLowerCase() === "cancel") {
+    await sb.schema("thira").from("line_pending_bills").update({
+      status: "cancelled", updated_at: new Date().toISOString()
+    }).eq("id", pending.id);
+    await reply([{ type: "text", text: "✗ ยกเลิกบิลแล้ว" }]);
+    return true;
+  }
+
+  // Parse ราคา/ลิตร — ยอมรับ "41.50", "41", "41.50 บาท", "41.5 ฿"
+  const m = text.replace(/[^\d.]/g, "").match(/(\d+(?:\.\d+)?)/);
+  const rate = m ? Number(m[1]) : NaN;
+  if (!rate || rate < 10 || rate > 100) {
+    await reply([{
+      type: "text",
+      text: `❓ ราคา/ลิตรไม่ถูกต้อง (ปกติ 30-50 ฿/ล.) — ลองส่งใหม่ เช่น "41.50"`,
+      quickReply: fuelRateQuickReply()
+    }]);
+    return true;
+  }
+
+  const liters = Number(pending.liters);
+  const amount = Math.round(liters * rate * 100) / 100;
+  const note = `เติมน้ำมัน ${liters} ลิตร × ${rate.toFixed(2)} ฿/ล.`;
+
+  await sb.schema("thira").from("line_pending_bills").update({
+    amount, note, status: "awaiting_confirm", updated_at: new Date().toISOString()
+  }).eq("id", pending.id);
+
+  await reply([
+    { type: "text", text: `🧮 ${liters} ล. × ${rate.toFixed(2)} ฿/ล. = ${fmtBaht(amount)} บ.` },
+    buildConfirmFlex({ ...pending, amount, note })
+  ]);
+  return true;
+}
+
+// ── Helper: ถามราคา/ลิตร พร้อม Quick Reply ตัวเลือกล่าสุด ──
+function askFuelRate(plate: string, liters: number): any {
+  return {
+    type: "text",
+    text: `🎫 ใบจำกัดน้ำมัน ${plate} • ${liters} ลิตร\n👉 ลิตรละกี่บาท?\n\nพิมพ์ตอบ เช่น "41.50" หรือกดปุ่ม↓`,
+    quickReply: fuelRateQuickReply()
+  };
+}
+
+function fuelRateQuickReply(): any {
+  // ราคาดีเซลที่ใช้บ่อย — ตัวเลข ช่วงปัจจุบัน (ปรับตามสถานการณ์)
+  const rates = ["38.79", "39.50", "40.00", "41.00", "41.50", "42.00"];
+  return {
+    items: [
+      ...rates.map(r => ({
+        type: "action",
+        action: { type: "message", label: `${r} ฿/ล.`, text: r }
+      })),
+      { type: "action", action: { type: "message", label: "❌ ยกเลิก", text: "/ยกเลิกบิล" } }
+    ]
+  };
 }
 
 function askTruck(_kind?: string): any {
@@ -538,6 +644,15 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
        เช่น "420 x 37.99" = 15,955 → liters=420, amount=15955
        → liters = ตัวเลขที่อยู่ก่อนเครื่องหมาย × (multiplied)
        → amount = ผลลัพธ์รวม (TOTAL/รวม)
+
+     🎫 รูปแบบ "ใบจำกัด/อนุมัติน้ำมัน" (สีเหลือง มี No. แดงด้านบน):
+       มีช่อง DATE, NAME (TR), CAR No., LIMIT (ลิตร)
+       เช่น: DATE 10 JUN 2026, CAR No. ฮ-9538, LIMIT 395
+       → plate = "71-9538" (จาก CAR No.)
+       → liters = ตัวเลขในช่อง LIMIT (เช่น 395)
+       → amount = null  (ใบนี้ไม่มีราคา — บอทจะถามทีหลัง)
+       → category = "ค่าน้ำมัน"
+       → note = "เติมน้ำมัน (ใบจำกัด No. XXXX)" ถ้าเห็น No.
 
   ⚡ Priority 3: ผ่านด่าน
      "ผ่านด่าน", "ทางด่วน", "Toll", "EXAT", "ETC"
