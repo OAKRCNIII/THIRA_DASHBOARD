@@ -214,15 +214,26 @@ async function loadCache() {
   if (pRes.error) throw pRes.error;
   if (mRes.error) throw mRes.error;
   cache.trucks = tRes.data;
+  // priceMap[code] = array sorted desc by effective_date (รองรับเปลี่ยนราคาตามวันที่)
   cache.priceMap = {};
-  pRes.data.forEach(p => cache.priceMap[p.destination_code] = p);
+  pRes.data.forEach(p => {
+    const k = p.destination_code;
+    if (!cache.priceMap[k]) cache.priceMap[k] = [];
+    cache.priceMap[k].push(p);
+  });
+  for (const k of Object.keys(cache.priceMap)) {
+    cache.priceMap[k].sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''));
+  }
   cache.factoryMap = {};
   mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
 }
 
-function lookupPrice(factory, invoice) {
+function lookupPrice(factory, invoice, tripDate) {
   const key = factory || (invoice || '').slice(0, 3);
-  return cache.priceMap[key] || null;
+  const list = cache.priceMap[key];
+  if (!list || list.length === 0) return null;
+  if (!tripDate) return list[0];
+  return list.find(p => p.effective_date <= tripDate) || null;
 }
 
 async function fetchTruckData(plate, p) {
@@ -246,7 +257,7 @@ function computePay(truck, p, data) {
   const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   let tripFee = 0, tripTarget = 0;
   for (const t of data.trips) {
-    const pr = lookupPrice(t.factory, t.invoice_no);
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in);
     if (pr) {
       tripFee += Number(pr.fee_driver || 0);
       tripTarget += Number(pr[fuelCol] || 0);
@@ -330,7 +341,7 @@ function renderTruckPage(truck, p, data, pay) {
 
   // Trip rows
   const tripRows = data.trips.map(t => {
-    const pr = lookupPrice(t.factory, t.invoice_no);
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in);
     const target = pr ? Number(pr[fuelCol] || 0) : 0;
     const fee = pr ? Number(pr.fee_driver || 0) : 0;
     const label = t.factory || `[${(t.invoice_no||'').slice(0,3)}] ${t.invoice_no || ''}`;

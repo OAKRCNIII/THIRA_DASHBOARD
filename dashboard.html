@@ -832,9 +832,16 @@ function parsePeriod(periodStr) {
 
 function formatPeriod(year, month, half) { return `${month}.${half}/${year}`; }
 
-function lookupPrice(priceMap, factory, invoice) {
+// priceMap[code] = [prices sorted by effective_date desc]
+// ถ้าส่ง tripDate มา → เลือก row ล่าสุดที่ effective_date <= tripDate
+// ถ้าไม่ส่ง → ใช้ตัวล่าสุด (default behavior แบบเก่า)
+function lookupPrice(priceMap, factory, invoice, tripDate) {
   const key = factory || (invoice || '').slice(0, 3);
-  return { price: priceMap[key] || null, key };
+  const list = priceMap[key];
+  if (!list || list.length === 0) return { price: null, key };
+  if (!tripDate) return { price: list[0], key };  // ตัวล่าสุด
+  const price = list.find(p => p.effective_date <= tripDate) || null;
+  return { price, key };
 }
 
 // Parse Thai date from freight_price_sets.name field
@@ -898,8 +905,17 @@ async function loadCache() {
   cache.fuelRate = frRes.data.length > 0 ? Number(frRes.data[0].baht_per_liter) : 41.81;
   cache.trucks = tRes.data;
   cache.prices = pRes.data;
+  // priceMap[code] = array sorted desc by effective_date
+  // (รองรับการเปลี่ยนราคาตามวันที่ — ดู lookupPrice)
   cache.priceMap = {};
-  pRes.data.forEach(p => cache.priceMap[p.destination_code] = p);
+  pRes.data.forEach(p => {
+    const k = p.destination_code;
+    if (!cache.priceMap[k]) cache.priceMap[k] = [];
+    cache.priceMap[k].push(p);
+  });
+  for (const k of Object.keys(cache.priceMap)) {
+    cache.priceMap[k].sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''));
+  }
   cache.factoryMap = {};
   mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
   // Parse effective_date from name; sort desc
@@ -1014,7 +1030,7 @@ function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extr
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0;
   let bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
   for (const t of trips) {
-    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no);
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in);
     if (price) {
       tripTarget += Number(price[fuelCol] || 0);
       tripFee += Number(price.fee_driver || 0);
@@ -1281,7 +1297,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
   let bill1Total = 0, bill2Total = 0, bill1Paid = 0, bill2Paid = 0;
   const bill1Trips = [], bill2Trips = [];
   const tripRows = trips.map(t => {
-    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no);
+    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in);
     const target = price ? Number(price[fuelCol] || 0) : 0;
     const fee = price ? Number(price.fee_driver || 0) : 0;
     tripTarget += target;
@@ -1932,7 +1948,7 @@ function renderInput(p, plate, data) {
   const fuelCol = truck && truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   let tripTarget = 0;
   for (const t of (data.trips || [])) {
-    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no);
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in);
     if (price) tripTarget += Number(price[fuelCol] || 0);
   }
   const extraL = (data.extras || []).reduce((s, e) => s + Number(e.liters || 0), 0);

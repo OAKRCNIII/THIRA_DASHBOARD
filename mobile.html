@@ -480,8 +480,16 @@ async function loadCache() {
   if (mRes.error) throw mRes.error;
   if (fRes.error) throw fRes.error;
   cache.trucks = tRes.data;
+  // priceMap[code] = array sorted desc by effective_date (รองรับเปลี่ยนราคาตามวันที่)
   cache.priceMap = {};
-  pRes.data.forEach(p => cache.priceMap[p.destination_code] = p);
+  pRes.data.forEach(p => {
+    const k = p.destination_code;
+    if (!cache.priceMap[k]) cache.priceMap[k] = [];
+    cache.priceMap[k].push(p);
+  });
+  for (const k of Object.keys(cache.priceMap)) {
+    cache.priceMap[k].sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''));
+  }
   cache.factoryMap = {};
   mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
   cache.priceSets = (fRes.data || [])
@@ -490,8 +498,12 @@ async function loadCache() {
     .sort((a, b) => b.effective_date.localeCompare(a.effective_date));
 }
 
-function lookupPrice(factory, invoice) {
-  return cache.priceMap[factory || (invoice||'').slice(0,3)] || null;
+function lookupPrice(factory, invoice, tripDate) {
+  const key = factory || (invoice||'').slice(0,3);
+  const list = cache.priceMap[key];
+  if (!list || list.length === 0) return null;
+  if (!tripDate) return list[0];
+  return list.find(p => p.effective_date <= tripDate) || null;
 }
 
 async function fetchTruckData(plate, p) {
@@ -538,7 +550,7 @@ function compute(truck, p, d) {
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0, bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
 
   for (const t of d.trips) {
-    const pr = lookupPrice(t.factory, t.invoice_no);
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in);
     if (pr) { tripTarget += Number(pr[fuelCol]||0); tripFee += Number(pr.fee_driver||0); }
     const ab = d.billStatus[t.container_no];
     const isPaid = !!(ab && ab.bill_no);
@@ -738,7 +750,7 @@ function showDetail(plate) {
   const profitClass = sum.profit >= 0 ? 'pos' : 'neg';
 
   const tripList = d.trips.slice(0, 10).map(tr => {
-    const pr = lookupPrice(tr.factory, tr.invoice_no);
+    const pr = lookupPrice(tr.factory, tr.invoice_no, tr.date_in);
     const fee = pr ? Number(pr.fee_driver||0) : 0;
     const label = tr.factory || (tr.invoice_no||'').slice(0,12);
     return `<div class="detail-list-item">
