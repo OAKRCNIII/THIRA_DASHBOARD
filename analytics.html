@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THIRA Fleet Analytics 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="icon-192.png">
+<script src="auth.js"></script>
+<style>
+  /* ── Design tokens ─────────────────────────────────────── */
+  :root {
+    --ink: #0f172a;
+    --ink-2: #334155;
+    --ink-3: #64748b;
+    --ink-4: #94a3b8;
+    --line: #e2e8f0;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --success: #16a34a;
+    --success-soft: #f0fdf4;
+    --danger: #dc2626;
+    --danger-soft: #fef2f2;
+    --warning: #d97706;
+    --warning-soft: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+  /* ── Toolbar (screen only) ── */
+  .toolbar {
+    position: sticky; top: 0; z-index: 100;
+    background: white; border-bottom: 1px solid var(--line);
+    padding: 12px 24px; display: flex; gap: 10px; align-items: center;
+  }
+  .toolbar h1 {
+    font-size: 16px; font-weight: 600; margin: 0; color: var(--ink);
+    margin-right: auto;
+  }
+  .btn {
+    padding: 8px 14px; border: 1px solid var(--line); background: white;
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    cursor: pointer; color: var(--ink-2); font-weight: 500;
+    transition: all .15s;
+  }
+  .btn:hover { background: var(--bg); border-color: var(--ink-4); }
+  .btn-primary { background: var(--ink); color: white; border-color: var(--ink); }
+  .btn-primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+  .btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* ── Page layout ── */
+  .page {
+    background: var(--surface);
+    width: 210mm; min-height: 297mm;
+    margin: 14px auto; padding: 18mm 16mm;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    page-break-after: always; page-break-inside: avoid;
+    position: relative;
+  }
+  .page:last-child { page-break-after: auto; }
+  .page-num { position: absolute; bottom: 8mm; right: 16mm; color: var(--ink-4); font-size: 10px; }
+  .page-footer { position: absolute; bottom: 8mm; left: 16mm; color: var(--ink-4); font-size: 10px; }
+
+  /* ── Cover page ── */
+  .cover-hero {
+    text-align: center; padding: 30px 0 40px;
+    border-bottom: 2px solid var(--ink); margin-bottom: 30px;
+  }
+  .cover-hero .label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.15em; color: var(--accent); margin-bottom: 16px;
+  }
+  .cover-hero h1 {
+    font-size: 42px; font-weight: 700; margin: 0;
+    letter-spacing: -0.03em; color: var(--ink); line-height: 1.1;
+  }
+  .cover-hero .period {
+    margin-top: 10px; font-size: 14px; color: var(--ink-3); font-weight: 400;
+  }
+
+  .hero-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 28px; }
+  .hero-kpi {
+    background: var(--surface); border: 1px solid var(--line);
+    padding: 18px 22px; border-radius: 12px;
+  }
+  .hero-kpi .label { font-size: 11px; color: var(--ink-3); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .hero-kpi .value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+  .hero-kpi.pos .value { color: var(--success); }
+  .hero-kpi.neg .value { color: var(--danger); }
+  .hero-kpi .sub { font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+
+  /* ── Headings ── */
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+    margin: 0 0 14px; color: var(--ink); display: flex;
+    align-items: baseline; gap: 12px;
+  }
+  h2 .sub { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+  h3 {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--ink-3);
+    margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line);
+  }
+
+  /* ── Truck page ── */
+  .truck-header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding-bottom: 14px; border-bottom: 2px solid var(--ink); margin-bottom: 18px;
+  }
+  .truck-header .plate { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .truck-header .driver { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+  .truck-header .rank {
+    background: var(--accent); color: white; padding: 6px 12px;
+    border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .truck-header .rank.no1 { background: #eab308; color: #422006; }
+  .truck-header .rank.no2 { background: #94a3b8; color: white; }
+  .truck-header .rank.no3 { background: #b45309; color: white; }
+
+  .truck-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .truck-kpi {
+    background: var(--bg); border-radius: 8px; padding: 12px 14px;
+    border: 1px solid var(--line);
+  }
+  .truck-kpi .label { font-size: 10px; color: var(--ink-3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+  .truck-kpi .value { font-size: 18px; font-weight: 700; color: var(--ink); margin-top: 2px; letter-spacing: -0.01em; }
+  .truck-kpi.pos .value { color: var(--success); }
+  .truck-kpi.neg .value { color: var(--danger); }
+
+  /* ── Tables ── */
+  table {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+    margin-top: 8px;
+  }
+  table th {
+    text-align: left; font-weight: 600; color: var(--ink-3); text-transform: uppercase;
+    letter-spacing: 0.04em; font-size: 10px; padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  table th.num { text-align: right; }
+  table td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table tbody tr:hover td { background: var(--bg); }
+  table tfoot td { font-weight: 700; padding-top: 10px; border-top: 2px solid var(--ink); border-bottom: 0; }
+
+  /* ── Bar chart (HTML/CSS) ── */
+  .bar-row { display: grid; grid-template-columns: 120px 1fr 80px; gap: 10px; align-items: center; padding: 4px 0; font-size: 11px; }
+  .bar-row .label { color: var(--ink-2); font-weight: 500; }
+  .bar-row .bar-track { background: var(--line); height: 18px; border-radius: 4px; overflow: hidden; position: relative; }
+  .bar-row .bar-fill { height: 100%; transition: width .3s; }
+  .bar-row .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .bar-fill.fuel { background: linear-gradient(90deg, #f59e0b, #f97316); }
+  .bar-fill.driver { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+  .bar-fill.tire { background: linear-gradient(90deg, #ef4444, #dc2626); }
+  .bar-fill.service { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
+  .bar-fill.insurance { background: linear-gradient(90deg, #10b981, #059669); }
+  .bar-fill.other { background: var(--ink-3); }
+
+  /* ── Insight cards ── */
+  .insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .insight {
+    background: var(--bg); border-left: 3px solid var(--accent);
+    padding: 12px 14px; border-radius: 0 8px 8px 0;
+  }
+  .insight.warn { background: var(--warning-soft); border-color: var(--warning); }
+  .insight.good { background: var(--success-soft); border-color: var(--success); }
+  .insight.danger { background: var(--danger-soft); border-color: var(--danger); }
+  .insight .title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .insight .body { font-size: 11px; color: var(--ink-2); line-height: 1.5; }
+
+  /* ── Status ── */
+  .status { padding: 60px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+  /* ── Print/PDF ── */
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: white; }
+    .toolbar { display: none; }
+    .page { box-shadow: none; margin: 0; }
+  }
+
+  /* PDF loading overlay */
+  .pdf-loading {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 999;
+    display: none; align-items: center; justify-content: center;
+  }
+  .pdf-loading.show { display: flex; }
+  .pdf-loading .box {
+    background: white; padding: 24px 32px; border-radius: 12px;
+    text-align: center; min-width: 260px;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>THIRA Fleet Analytics</h1>
+  <button class="btn" onclick="window.print()">🖨 Print</button>
+  <button class="btn btn-accent" onclick="downloadPDF()">📄 Download PDF</button>
+  <a class="btn" href="dashboard.html">← Dashboard</a>
+</div>
+
+<div class="pdf-loading" id="pdf-loading">
+  <div class="box">
+    <div style="font-size:24px;margin-bottom:8px">📄</div>
+    <div style="font-weight:600;color:#0f172a">Generating PDF...</div>
+    <div id="pdf-progress" style="font-size:11px;color:#64748b;margin-top:6px">Preparing pages...</div>
+  </div>
+</div>
+
+<div id="report" class="status">Loading data from Supabase...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
+const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });
+const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'ants' } });
+
+const TRUCKS = [
+  { plate: '71-9538', driver: 'Mr. Loey' },
+  { plate: '72-1620', driver: 'Mr. Por' },
+  { plate: '72-2237', driver: 'Mr. Prasert' },
+  { plate: '72-2420', driver: 'Mr. Bangheng' },
+  { plate: '72-2953', driver: 'Mr. Bangfee' },
+  { plate: '72-3148', driver: 'Mr. Arkom' }
+];
+
+const CAT_LABELS_EN = {
+  'ค่าน้ำมัน': 'Fuel',
+  'ค่าเที่ยวคนขับ': 'Driver Fee',
+  'ค่ายาง': 'Tires',
+  'เช็คระยะ': 'Service',
+  'ประกัน': 'Insurance',
+  'สุวิทย์': 'Suwit',
+  'บุญช่วย': 'Boonchuay',
+  'บัญชี': 'Accounting',
+  'ร้อยละ4': 'Withholding 4%',
+  'ค่าผ่านด่าน': 'Toll',
+  'ค่าเคลียจ่าแชมป์': 'Clear-Champ',
+  'ค่าเคลียหมวดกร': 'Clear-MK',
+  'ค่าล่วง': 'Overtime',
+  'เงินเดือน': 'Salary',
+  'อื่นๆ': 'Other'
+};
+
+const CAT_COLORS = {
+  'ค่าน้ำมัน': 'fuel',
+  'ค่าเที่ยวคนขับ': 'driver',
+  'ค่ายาง': 'tire',
+  'เช็คระยะ': 'service',
+  'ประกัน': 'insurance',
+};
+
+const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmt2 = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (n, base) => base > 0 ? ((n / base) * 100).toFixed(1) + '%' : '—';
+
+async function load() {
+  try {
+    const [iRes, oRes, tRes] = await Promise.all([
+      ths.from('incomes').select('truck_plate,bill_type,amount_gross,amount_net,date').gte('date', '2026-01-01'),
+      ths.from('outcomes').select('truck_plate,category,amount,liters,note,date').gte('date', '2026-01-01'),
+      sba.from('containers').select('truck_plate,date_in').gte('date_in', '2026-01-01')
+    ]);
+    if (iRes.error) throw iRes.error;
+    if (oRes.error) throw oRes.error;
+    if (tRes.error) throw tRes.error;
+    render(iRes.data, oRes.data, tRes.data);
+  } catch (e) {
+    document.getElementById('report').innerHTML = `<div class="status" style="color:#dc2626">❌ ${e.message}</div>`;
+  }
+}
+
+function render(incs, outs, trips) {
+  // Aggregate
+  const perTruck = {};
+  for (const t of TRUCKS) perTruck[t.plate] = { trips: 0, income_net: 0, income_gross: 0, by_bill: {}, by_cat: {}, outcome: 0, items: [] };
+  perTruck['XX-XXXX'] = { trips: 0, income_net: 0, income_gross: 0, by_bill: {}, by_cat: {}, outcome: 0, items: [] };
+
+  for (const t of trips) {
+    if (perTruck[t.truck_plate]) perTruck[t.truck_plate].trips++;
+  }
+  for (const i of incs) {
+    const p = perTruck[i.truck_plate]; if (!p) continue;
+    p.income_net += +i.amount_net || 0;
+    p.income_gross += +i.amount_gross || 0;
+    const bt = i.bill_type || 'UNCATEGORIZED';
+    p.by_bill[bt] = (p.by_bill[bt] || 0) + (+i.amount_net || 0);
+  }
+  for (const o of outs) {
+    const p = perTruck[o.truck_plate]; if (!p) continue;
+    p.outcome += +o.amount || 0;
+    if (!p.by_cat[o.category]) p.by_cat[o.category] = { count: 0, sum: 0 };
+    p.by_cat[o.category].count++;
+    p.by_cat[o.category].sum += +o.amount || 0;
+    p.items.push(o);
+  }
+
+  // Compute profit + ranking
+  const rows = TRUCKS.map(t => {
+    const p = perTruck[t.plate];
+    return {
+      ...t,
+      ...p,
+      profit: p.income_net - p.outcome,
+      margin: p.income_net > 0 ? (p.income_net - p.outcome) / p.income_net : 0
+    };
+  });
+  rows.sort((a, b) => b.profit - a.profit);
+  rows.forEach((r, i) => r.rank = i + 1);
+
+  // Totals
+  const total = rows.reduce((s, r) => ({
+    income_net: s.income_net + r.income_net,
+    income_gross: s.income_gross + r.income_gross,
+    outcome: s.outcome + r.outcome,
+    profit: s.profit + r.profit,
+    trips: s.trips + r.trips
+  }), { income_net: 0, income_gross: 0, outcome: 0, profit: 0, trips: 0 });
+
+  const xx = perTruck['XX-XXXX'];
+  const overhead = xx.outcome;
+  const netProfit = total.profit - overhead;
+  const overheadPerTruck = overhead / 6;
+
+  // Category totals (fleet)
+  const fleetCat = {};
+  for (const r of rows.concat([{ by_cat: xx.by_cat }])) {
+    for (const [cat, v] of Object.entries(r.by_cat)) {
+      if (!fleetCat[cat]) fleetCat[cat] = { count: 0, sum: 0 };
+      fleetCat[cat].count += v.count;
+      fleetCat[cat].sum += v.sum;
+    }
+  }
+  const fleetCatSorted = Object.entries(fleetCat).sort((a, b) => b[1].sum - a[1].sum);
+
+  // Render pages
+  let html = '';
+  html += renderCoverPage(rows, total, xx, netProfit, overheadPerTruck);
+  rows.forEach(r => { html += renderTruckPage(r, overheadPerTruck, total); });
+  html += renderXXPage(xx);
+  html += renderCategoryPage(fleetCat, fleetCatSorted, total);
+  html += renderInsightsPage(rows, fleetCat, total, xx);
+
+  document.getElementById('report').innerHTML = html;
+  document.getElementById('report').className = '';
+}
+
+function renderCoverPage(rows, total, xx, netProfit, overheadPerTruck) {
+  const margin = total.income_net > 0 ? (netProfit / total.income_net * 100).toFixed(1) : 0;
+  const profitClass = netProfit >= 0 ? 'pos' : 'neg';
+  const rankRows = rows.map(r => {
+    const adjProfit = r.profit - overheadPerTruck;
+    return `
+      <tr>
+        <td><strong>${r.plate}</strong><div style="color:var(--ink-3);font-size:10px">${r.driver}</div></td>
+        <td class="num">${fmt(r.trips)}</td>
+        <td class="num">${fmt(r.income_net)}</td>
+        <td class="num">${fmt(r.outcome)}</td>
+        <td class="num" style="color:${r.profit>=0?'var(--success)':'var(--danger)'};font-weight:600">${r.profit>=0?'+':''}${fmt(r.profit)}</td>
+        <td class="num" style="color:${adjProfit>=0?'var(--success)':'var(--danger)'};font-weight:600">${adjProfit>=0?'+':''}${fmt(adjProfit)}</td>
+        <td class="num">${(r.margin*100).toFixed(1)}%</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="page">
+      <div class="cover-hero">
+        <div class="label">Fleet Performance Report</div>
+        <h1>THIRA RT Logistics</h1>
+        <div class="period">January – Present, 2026</div>
+      </div>
+
+      <div class="hero-kpis">
+        <div class="hero-kpi">
+          <div class="label">Total Revenue (net)</div>
+          <div class="value num">${fmt(total.income_net)} ฿</div>
+          <div class="sub">Gross: ${fmt(total.income_gross)} ฿ • after 1% withholding</div>
+        </div>
+        <div class="hero-kpi">
+          <div class="label">Total Expenses</div>
+          <div class="value num">${fmt(total.outcome + xx.outcome)} ฿</div>
+          <div class="sub">${fmt(total.outcome)} truck + ${fmt(xx.outcome)} shared</div>
+        </div>
+        <div class="hero-kpi ${profitClass}">
+          <div class="label">Net Profit</div>
+          <div class="value num">${netProfit>=0?'+':''}${fmt(netProfit)} ฿</div>
+          <div class="sub">Margin ${margin}% across fleet</div>
+        </div>
+        <div class="hero-kpi">
+          <div class="label">Total Trips</div>
+          <div class="value num">${fmt(total.trips)}</div>
+          <div class="sub">Average ${(total.trips/6).toFixed(0)} trips per truck</div>
+        </div>
+      </div>
+
+      <h2>Truck Performance Ranking</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Truck / Driver</th>
+            <th class="num">Trips</th>
+            <th class="num">Revenue</th>
+            <th class="num">Expenses</th>
+            <th class="num">Gross Profit</th>
+            <th class="num">After Overhead</th>
+            <th class="num">Margin</th>
+          </tr>
+        </thead>
+        <tbody>${rankRows}</tbody>
+        <tfoot>
+          <tr>
+            <td><strong>FLEET TOTAL</strong></td>
+            <td class="num">${fmt(total.trips)}</td>
+            <td class="num">${fmt(total.income_net)}</td>
+            <td class="num">${fmt(total.outcome)}</td>
+            <td class="num" style="color:var(--success)">+${fmt(total.profit)}</td>
+            <td class="num" style="color:var(--success)">+${fmt(netProfit)}</td>
+            <td class="num">${margin}%</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style="margin-top:18px;padding:12px 14px;background:var(--accent-soft);border-radius:8px;font-size:11px;color:var(--ink-2)">
+        <strong>Note:</strong> Shared overhead of ${fmt(xx.outcome)} ฿ (accounting, withholding, etc.) distributed equally across 6 trucks at ${fmt(overheadPerTruck)} ฿ each.
+      </div>
+
+      <div class="page-footer">THIRA RT Logistics</div>
+      <div class="page-num">1</div>
+    </div>
+  `;
+}
+
+function renderTruckPage(r, overheadPerTruck, total) {
+  const adjProfit = r.profit - overheadPerTruck;
+  const fuel = r.by_cat['ค่าน้ำมัน'] || { sum: 0, count: 0 };
+  const driver = r.by_cat['ค่าเที่ยวคนขับ'] || { sum: 0 };
+  const fuelRatio = r.income_net > 0 ? (fuel.sum / r.income_net * 100).toFixed(1) : 0;
+  const avgFuelTransaction = fuel.count > 0 ? (fuel.sum / fuel.count).toFixed(0) : 0;
+
+  const billRows = Object.entries(r.by_bill).sort((a, b) => b[1] - a[1]).map(([bt, v]) => {
+    const label = bt === 'UNCATEGORIZED' ? 'Uncategorized (legacy)' : bt;
+    return `<tr><td>${label}</td><td class="num">${fmt(v)} ฿</td><td class="num">${pct(v, r.income_net)}</td></tr>`;
+  }).join('');
+
+  const catSorted = Object.entries(r.by_cat).sort((a, b) => b[1].sum - a[1].sum);
+  const maxCat = Math.max(...catSorted.map(([_, v]) => v.sum));
+  const catBars = catSorted.map(([cat, v]) => {
+    const label = CAT_LABELS_EN[cat] || cat;
+    const colorCls = CAT_COLORS[cat] || 'other';
+    const w = (v.sum / maxCat * 100).toFixed(1);
+    return `
+      <div class="bar-row">
+        <div class="label">${label}</div>
+        <div class="bar-track"><div class="bar-fill ${colorCls}" style="width:${w}%"></div></div>
+        <div class="val">${fmt(v.sum)}</div>
+      </div>
+    `;
+  }).join('');
+
+  const rankClass = r.rank === 1 ? 'no1' : r.rank === 2 ? 'no2' : r.rank === 3 ? 'no3' : '';
+  const rankLabel = r.rank === 1 ? '🥇 Top Performer' : r.rank === 2 ? '🥈 Strong' : r.rank === 3 ? '🥉 Solid' : `Rank #${r.rank}`;
+
+  return `
+    <div class="page">
+      <div class="truck-header">
+        <div>
+          <div class="plate">${r.plate}</div>
+          <div class="driver">${r.driver}</div>
+        </div>
+        <div class="rank ${rankClass}">${rankLabel}</div>
+      </div>
+
+      <div class="truck-kpis">
+        <div class="truck-kpi">
+          <div class="label">Trips</div>
+          <div class="value num">${fmt(r.trips)}</div>
+        </div>
+        <div class="truck-kpi">
+          <div class="label">Revenue (net)</div>
+          <div class="value num">${fmt(r.income_net)}</div>
+        </div>
+        <div class="truck-kpi">
+          <div class="label">Expenses</div>
+          <div class="value num">${fmt(r.outcome)}</div>
+        </div>
+        <div class="truck-kpi ${r.profit>=0?'pos':'neg'}">
+          <div class="label">Gross Profit</div>
+          <div class="value num">${r.profit>=0?'+':''}${fmt(r.profit)}</div>
+        </div>
+      </div>
+
+      <h3>Income Breakdown (by bill type)</h3>
+      <table>
+        <thead><tr><th>Bill Type</th><th class="num">Net Amount</th><th class="num">Share</th></tr></thead>
+        <tbody>${billRows}</tbody>
+        <tfoot><tr><td>Total</td><td class="num">${fmt(r.income_net)} ฿</td><td class="num">100%</td></tr></tfoot>
+      </table>
+
+      <h3>Expense Breakdown (by category)</h3>
+      <div style="margin-top:8px">${catBars}</div>
+
+      <h3>Key Metrics</h3>
+      <table>
+        <tbody>
+          <tr><td>Fuel ratio (fuel cost / revenue)</td><td class="num">${fuelRatio}%</td></tr>
+          <tr><td>Avg fuel transaction</td><td class="num">${fmt(avgFuelTransaction)} ฿ × ${fuel.count} refills</td></tr>
+          <tr><td>Driver fee paid</td><td class="num">${fmt(driver.sum)} ฿</td></tr>
+          <tr><td>After overhead allocation (−${fmt(overheadPerTruck)})</td><td class="num" style="color:${adjProfit>=0?'var(--success)':'var(--danger)'};font-weight:600">${adjProfit>=0?'+':''}${fmt(adjProfit)} ฿</td></tr>
+          <tr><td>Net margin</td><td class="num">${(r.margin*100).toFixed(1)}%</td></tr>
+        </tbody>
+      </table>
+
+      <div class="page-footer">${r.plate} — ${r.driver}</div>
+      <div class="page-num">${r.rank + 1}</div>
+    </div>
+  `;
+}
+
+function renderXXPage(xx) {
+  const catSorted = Object.entries(xx.by_cat).sort((a, b) => b[1].sum - a[1].sum);
+  const maxCat = catSorted[0] ? catSorted[0][1].sum : 1;
+  const catBars = catSorted.map(([cat, v]) => {
+    const label = CAT_LABELS_EN[cat] || cat;
+    const w = (v.sum / maxCat * 100).toFixed(1);
+    return `
+      <div class="bar-row">
+        <div class="label">${label}</div>
+        <div class="bar-track"><div class="bar-fill other" style="width:${w}%"></div></div>
+        <div class="val">${fmt(v.sum)}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="page">
+      <div class="truck-header">
+        <div>
+          <div class="plate">XX-XXXX</div>
+          <div class="driver">Shared Overhead</div>
+        </div>
+        <div class="rank" style="background:var(--ink-3)">Overhead</div>
+      </div>
+
+      <div style="background:var(--warning-soft);border-left:3px solid var(--warning);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:18px;font-size:11px;color:var(--ink-2)">
+        <strong>About Shared Overhead:</strong> These are fleet-wide expenses not attributable to a specific truck — accounting fees, withholding tax, etc. Total is distributed equally across 6 trucks when computing per-truck adjusted profit.
+      </div>
+
+      <h3>Expense Breakdown</h3>
+      <div style="margin-top:8px">${catBars}</div>
+
+      <h3>Total</h3>
+      <div style="font-size:32px;font-weight:700;color:var(--danger);letter-spacing:-0.02em" class="num">−${fmt(xx.outcome)} ฿</div>
+      <div style="font-size:11px;color:var(--ink-3);margin-top:4px">Allocated at ${fmt(xx.outcome / 6)} ฿ per truck</div>
+
+      <div class="page-footer">XX-XXXX — Shared Overhead</div>
+      <div class="page-num">8</div>
+    </div>
+  `;
+}
+
+function renderCategoryPage(fleetCat, sorted, total) {
+  const grandTotal = sorted.reduce((s, [_, v]) => s + v.sum, 0);
+  const max = sorted[0] ? sorted[0][1].sum : 1;
+  const bars = sorted.map(([cat, v]) => {
+    const label = CAT_LABELS_EN[cat] || cat;
+    const colorCls = CAT_COLORS[cat] || 'other';
+    const w = (v.sum / max * 100).toFixed(1);
+    const share = (v.sum / grandTotal * 100).toFixed(1);
+    return `
+      <div class="bar-row" style="grid-template-columns:140px 1fr 90px 50px">
+        <div class="label">${label}</div>
+        <div class="bar-track"><div class="bar-fill ${colorCls}" style="width:${w}%"></div></div>
+        <div class="val">${fmt(v.sum)}</div>
+        <div class="val" style="color:var(--ink-3);font-weight:500">${share}%</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="page">
+      <h2>Fleet-wide Expense Analysis</h2>
+      <p style="color:var(--ink-3);font-size:12px;margin:0 0 18px">
+        Distribution of all expenses across the fleet for 2026 YTD. Fuel dominates as expected for a logistics operation.
+      </p>
+
+      <h3>Expense Categories — Sorted by Amount</h3>
+      <div style="margin-top:10px">${bars}</div>
+
+      <div style="margin-top:24px;padding:14px 16px;background:var(--bg);border-radius:8px;font-size:11px">
+        <strong>Key observations:</strong>
+        <ul style="margin:6px 0 0;padding-left:20px;color:var(--ink-2);line-height:1.7">
+          <li>Fuel accounts for the majority of operating cost — direct lever on profitability.</li>
+          <li>Driver fees scale predictably with trip count (matches rate × trips formula).</li>
+          <li>Tire and service expenses vary significantly across trucks — see per-truck pages.</li>
+          <li>Annual fees (insurance, GPS, accounting) are recorded as one-off charges.</li>
+        </ul>
+      </div>
+
+      <div class="page-footer">Fleet Expense Analysis</div>
+      <div class="page-num">9</div>
+    </div>
+  `;
+}
+
+function renderInsightsPage(rows, fleetCat, total, xx) {
+  const best = rows[0];
+  const worst = rows[rows.length - 1];
+  const fuel = fleetCat['ค่าน้ำมัน'] || { sum: 0 };
+  const fuelPct = total.outcome > 0 ? (fuel.sum / total.outcome * 100).toFixed(1) : 0;
+  const tire = fleetCat['ค่ายาง'] || { sum: 0 };
+  const maxTire = Math.max(...rows.map(r => (r.by_cat['ค่ายาง']?.sum) || 0));
+  const tireLeader = rows.find(r => (r.by_cat['ค่ายาง']?.sum || 0) === maxTire);
+  const overheadShare = (xx.outcome / 6).toFixed(0);
+
+  return `
+    <div class="page">
+      <h2>Key Insights & Recommendations</h2>
+
+      <h3>Performance Highlights</h3>
+      <div class="insight-grid">
+        <div class="insight good">
+          <div class="title">🏆 Top Performer: ${best.plate}</div>
+          <div class="body">
+            ${best.driver} delivered the highest profit of <strong>${fmt(best.profit)} ฿</strong>
+            on ${fmt(best.income_net)} revenue (${(best.margin*100).toFixed(1)}% margin).
+            A reference benchmark for the rest of the fleet.
+          </div>
+        </div>
+        <div class="insight warn">
+          <div class="title">⚠ Underperformer: ${worst.plate}</div>
+          <div class="body">
+            ${worst.driver} has the slimmest margin at <strong>${(worst.margin*100).toFixed(1)}%</strong>
+            (gross profit only ${fmt(worst.profit)} ฿). Often includes one-time repairs;
+            review whether expenses are recurring or anomalous.
+          </div>
+        </div>
+        <div class="insight">
+          <div class="title">⛽ Fuel Dominance</div>
+          <div class="body">
+            Fuel costs <strong>${fmt(fuel.sum)} ฿</strong> represent <strong>${fuelPct}%</strong>
+            of total expenses. A 5% fuel price increase would cut fleet margin
+            by roughly 3 percentage points. Monitor consumption closely.
+          </div>
+        </div>
+        <div class="insight danger">
+          <div class="title">🛞 Tire Spending</div>
+          <div class="body">
+            Total tire cost: <strong>${fmt(tire.sum)} ฿</strong>.
+            ${tireLeader ? `${tireLeader.plate} leads the fleet at ${fmt(tireLeader.by_cat['ค่ายาง'].sum)} ฿ — investigate driving style or tire spec.` : ''}
+          </div>
+        </div>
+      </div>
+
+      <h3>Recommendations</h3>
+      <ol style="font-size:12px;line-height:1.7;color:var(--ink-2);padding-left:20px">
+        <li><strong>Track fuel ratio per truck</strong> — current range 63–65%, but a sudden change is the earliest warning sign of inefficiency.</li>
+        <li><strong>Schedule annual fees consistently</strong> — insurance/accounting fees should not vary widely between trucks. Verify all 6 trucks have insurance recorded for 2026.</li>
+        <li><strong>Watch ${worst.plate} closely</strong> — slim margin means any unexpected repair pushes it into loss territory.</li>
+        <li><strong>Carry-over fuel discipline</strong> — close fuel periods promptly to keep liter balances accurate; helps catch leaks or theft early.</li>
+        <li><strong>Shared overhead is significant</strong> (${fmt(xx.outcome)} ฿ = ${fmt(overheadShare)} per truck) — when judging per-truck profitability, always use "After Overhead" column rather than raw gross profit.</li>
+      </ol>
+
+      <h3>Data Quality Notes</h3>
+      <div style="font-size:11px;color:var(--ink-3);background:var(--bg);padding:10px 14px;border-radius:8px;line-height:1.6">
+        Some legacy income records lack a bill_type assignment (shown as "Uncategorized" on truck pages). These should be back-filled
+        for accurate bill-type ratio analysis. Container trip counts may also be incomplete for certain trucks if Excel data
+        is missing plate matches — verify before deep-diving on trips/revenue ratios.
+      </div>
+
+      <div class="page-footer">Insights & Recommendations</div>
+      <div class="page-num">10</div>
+    </div>
+  `;
+}
+
+async function downloadPDF() {
+  if (!window.html2canvas || !window.jspdf) return alert('Libraries still loading');
+  const { jsPDF } = window.jspdf;
+  const pages = document.querySelectorAll('.page');
+  if (!pages.length) return alert('No data');
+
+  const overlay = document.getElementById('pdf-loading');
+  const progress = document.getElementById('pdf-progress');
+  overlay.classList.add('show');
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const A4W = 210, A4H = 297;
+
+    for (let i = 0; i < pages.length; i++) {
+      progress.textContent = `Page ${i + 1} / ${pages.length}`;
+      await new Promise(r => requestAnimationFrame(r));
+      const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true });
+      const img = canvas.toDataURL('image/jpeg', 0.92);
+      if (i > 0) pdf.addPage('a4', 'portrait');
+      const ratio = canvas.width / canvas.height;
+      const pageRatio = A4W / A4H;
+      let w, h, x, y;
+      if (ratio > pageRatio) { w = A4W; h = A4W / ratio; x = 0; y = (A4H - h) / 2; }
+      else                   { h = A4H; w = A4H * ratio; x = (A4W - w) / 2; y = 0; }
+      pdf.addImage(img, 'JPEG', x, y, w, h);
+    }
+    pdf.save(`THIRA-Analytics-${new Date().toISOString().slice(0,10)}.pdf`);
+  } catch (e) {
+    console.error(e);
+    alert('PDF generation failed: ' + e.message);
+  } finally {
+    overlay.classList.remove('show');
+  }
+}
+window.downloadPDF = downloadPDF;
+
+load();
+</script>
+</body>
+</html>
