@@ -769,7 +769,8 @@ window.setAntsKey = function() {
 const TRUCK_PLATES = ['71-9538', '72-1620', '72-2237', '72-2420', '72-2953', '72-3148'];
 const THAI_MONTHS = ['', 'ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const THAI_MONTHS_FULL = ['', 'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const BILL1_PREFIXES = ['OGM', 'KNT'];  // invoice_no starts with these → Bill 1 (OGM&KNT)
+// BILL 1 = OGM(A) เท่านั้น + KNT ทุกแบบ
+//   OGM(J), OGM(Yang), OGM(B), ฯลฯ → BILL 2 (อื่นๆ)
 const OUTCOME_CATEGORIES = [
   'ค่าน้ำมัน',          // ต้องกรอก ลิตร + บาท
   'ค่าเที่ยวคนขับ',     // บาท
@@ -880,8 +881,11 @@ function billPriceForTrip(trip, factoryMap, priceSets) {
 }
 
 function isBill1(trip) {
-  const inv = (trip.invoice_no || '').toUpperCase();
-  return BILL1_PREFIXES.some(p => inv.startsWith(p));
+  // ลบ space ทั้งหมดเพื่อจับ "OGM(A)" / "OGM (A)" / "OGM( A )" ให้เหมือนกัน
+  const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  if (inv.startsWith('KNT')) return true;       // KNT ทุกแบบ
+  if (inv.startsWith('OGM(A)')) return true;    // เฉพาะ OGM(A) เท่านั้น
+  return false;                                  // OGM(J), OGM(Yang), OGM(B)... → BILL 2
 }
 
 // ─── Data fetch ────────────────────────────────────────────

@@ -429,11 +429,12 @@ function parsePeriod(s) {
   return {year, month, half, start: half===1?`${year}-${String(month).padStart(2,'0')}-01`:`${year}-${String(month).padStart(2,'0')}-16`, end: half===1?`${year}-${String(month).padStart(2,'0')}-15`:`${year}-${String(month).padStart(2,'0')}-${ld}`, halfLabel: half===1?`ครึ่งแรก`:`ครึ่งหลัง`};
 }
 
-const BILL1_PREFIXES = ['OGM', 'KNT'];
-
+// BILL 1 = OGM(A) + KNT ทุกแบบ  (OGM(J), OGM(Yang), ฯลฯ → BILL 2)
 function isBill1(trip) {
-  const inv = (trip.invoice_no || '').toUpperCase();
-  return BILL1_PREFIXES.some(p => inv.startsWith(p));
+  const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  if (inv.startsWith('KNT')) return true;
+  if (inv.startsWith('OGM(A)')) return true;
+  return false;
 }
 
 // Parse Thai date e.g. "อัพเดต 17 มีนาคม 2569" → "2026-03-17"
