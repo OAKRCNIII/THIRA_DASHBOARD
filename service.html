@@ -404,6 +404,60 @@ function render(rows) {
   }
   html += `</div>`;
 
+  // ── Matrix บาท × คัน × เดือน ──
+  const ytdRowsAll = rows.filter(r => r.date >= '2026-01-01');
+  const matrix = {};   // month → { plate → amount }
+  const monthSet = new Set();
+  for (const r of ytdRowsAll) {
+    const m = parseInt(r.date.split('-')[1]);
+    monthSet.add(m);
+    if (!matrix[m]) matrix[m] = {};
+    matrix[m][r.truck_plate] = (matrix[m][r.truck_plate] || 0) + Number(r.amount || 0);
+  }
+  const monthList = [...monthSet].sort((a,b) => a-b);
+  const THAI_MONTH = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const colTotal = {};   // per plate
+  for (const t of TRUCKS) colTotal[t.plate] = 0;
+  let grand = 0;
+  const matrixRows = monthList.map(m => {
+    let rowSum = 0;
+    const cells = TRUCKS.map(t => {
+      const v = matrix[m][t.plate] || 0;
+      colTotal[t.plate] += v;
+      rowSum += v;
+      return `<td class="num">${v > 0 ? fmt(v) : '<span style="color:#cbd5e1">—</span>'}</td>`;
+    }).join('');
+    grand += rowSum;
+    const maxRow = Math.max(...Object.values(matrix).map(mm => Object.values(mm).reduce((s,n)=>s+n,0)));
+    const isHeavy = rowSum >= maxRow * 0.8 && rowSum > 0;
+    return `<tr>
+      <td><strong>${THAI_MONTH[m]}</strong></td>
+      ${cells}
+      <td class="num"><strong>${fmt(rowSum)}${isHeavy ? ' ⚠' : ''}</strong></td>
+    </tr>`;
+  }).join('');
+
+  html += `<div class="section-title">📊 Service Matrix — บาท × คัน × เดือน</div>`;
+  html += `<div class="table-card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>เดือน</th>
+          ${TRUCKS.map(t => `<th class="num">${t.plate}</th>`).join('')}
+          <th class="num">TOTAL</th>
+        </tr>
+      </thead>
+      <tbody>${matrixRows}</tbody>
+      <tfoot>
+        <tr style="background:#0f172a;color:white">
+          <td style="padding:12px 10px;color:white"><strong>TOTAL</strong></td>
+          ${TRUCKS.map(t => `<td class="num" style="padding:12px 10px;color:white"><strong>${fmt(colTotal[t.plate])}</strong></td>`).join('')}
+          <td class="num" style="padding:12px 10px;color:#fde68a;font-size:15px"><strong>${fmt(grand)}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+
   // Cost stats
   html += `<div class="section-title">💰 Cost Summary</div>`;
   html += `
