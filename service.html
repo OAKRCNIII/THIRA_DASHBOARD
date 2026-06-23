@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service Schedule — THIRA</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="icon-192.png">
+<script src="auth.js"></script>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #fff;
+    --ink: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #64748b;
+    --ink-4: #94a3b8;
+    --line: #e2e8f0;
+    --accent: #0ea5e9;
+    --good: #10b981;
+    --good-bg: #ecfdf5;
+    --warn: #f59e0b;
+    --warn-bg: #fffbeb;
+    --bad: #ef4444;
+    --bad-bg: #fef2f2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Sarabun', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .num { font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+
+  /* Top bar */
+  .toolbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 20px;
+    display: flex; gap: 12px; align-items: center;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .toolbar h1 {
+    font-size: 18px; font-weight: 700; margin: 0;
+    color: var(--ink); margin-right: auto;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toolbar .logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    display: grid; place-items: center; color: white;
+    font-size: 18px; font-weight: 700;
+  }
+  .btn {
+    padding: 7px 14px; border: 1px solid var(--line); background: white;
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    cursor: pointer; color: var(--ink-2); font-weight: 500;
+    transition: all .15s; text-decoration: none;
+  }
+  .btn:hover { background: var(--bg); border-color: var(--ink-4); }
+
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  /* Hero stats */
+  .hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .hero-card {
+    background: var(--surface); border-radius: 14px; padding: 16px 18px;
+    border: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .hero-card .label {
+    font-size: 11px; color: var(--ink-3); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .hero-card .value {
+    font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;
+  }
+  .hero-card .sub { font-size: 12px; color: var(--ink-3); }
+  .hero-card.bad { background: var(--bad-bg); border-color: #fecaca; }
+  .hero-card.bad .value { color: var(--bad); }
+  .hero-card.warn { background: var(--warn-bg); border-color: #fde68a; }
+  .hero-card.warn .value { color: var(--warn); }
+  .hero-card.good { background: var(--good-bg); border-color: #a7f3d0; }
+  .hero-card.good .value { color: var(--good); }
+
+  /* Section header */
+  .section-title {
+    font-size: 14px; font-weight: 700; color: var(--ink);
+    margin: 8px 0 12px; display: flex; align-items: center; gap: 8px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+
+  /* Truck cards */
+  .trucks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .trucks { grid-template-columns: 1fr; } .hero { grid-template-columns: repeat(2,1fr); } }
+
+  .truck-card {
+    background: var(--surface); border-radius: 16px;
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .truck-card-header {
+    padding: 16px 20px; display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 1px solid var(--line);
+  }
+  .truck-plate { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-family: 'Inter', sans-serif; }
+  .truck-driver { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .status-badge {
+    padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .status-badge.good { background: var(--good-bg); color: var(--good); }
+  .status-badge.warn { background: var(--warn-bg); color: var(--warn); }
+  .status-badge.bad  { background: var(--bad-bg);  color: var(--bad); animation: pulse-bad 2s infinite; }
+  @keyframes pulse-bad { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+  .truck-body { padding: 16px 20px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .info-item .lbl { font-size: 11px; color: var(--ink-3); font-weight: 500; margin-bottom: 2px; }
+  .info-item .val { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .info-item .val.num { font-size: 16px; }
+  .info-item .sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+
+  /* Progress bar (km in current cycle) */
+  .progress-section { margin-top: 12px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+  .progress-label strong { color: var(--ink); font-weight: 600; font-family: 'Inter', sans-serif; }
+  .progress-bar {
+    height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden;
+    position: relative; border: 1px solid var(--line);
+  }
+  .progress-fill {
+    height: 100%; transition: width .3s;
+    background: linear-gradient(90deg, var(--good), #34d399);
+  }
+  .progress-fill.warn { background: linear-gradient(90deg, var(--warn), #fbbf24); }
+  .progress-fill.bad  { background: linear-gradient(90deg, var(--bad), #f87171); }
+  .progress-fill.overflow { background: repeating-linear-gradient(45deg, var(--bad), var(--bad) 8px, #b91c1c 8px, #b91c1c 16px); }
+
+  /* History table */
+  .table-card {
+    background: var(--surface); border-radius: 16px; border: 1px solid var(--line);
+    padding: 18px 20px; margin-bottom: 20px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left; font-weight: 600; color: var(--ink-3);
+    text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px;
+    padding: 8px 10px; border-bottom: 1px solid var(--line);
+  }
+  th.num { text-align: right; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: 'Inter', sans-serif; }
+  tbody tr:hover td { background: var(--bg); }
+
+  /* Cost summary cards */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--surface); padding: 16px 18px; border-radius: 14px;
+    border: 1px solid var(--line);
+  }
+  .stat-card .lbl { font-size: 11px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-card .val { font-size: 28px; font-weight: 700; color: var(--ink); margin-top: 4px; letter-spacing: -0.02em; }
+  .stat-card .sub { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+  .status { padding: 60px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+  /* Print */
+  @page { size: A4 portrait; margin: 10mm; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: white; }
+    .toolbar, .btn { display: none !important; }
+    .wrap { padding: 0; max-width: none; }
+    .trucks { page-break-inside: avoid; }
+    .truck-card, .table-card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1><span class="logo">🔧</span> Service Schedule</h1>
+  <button class="btn" onclick="window.print()">🖨 พิมพ์</button>
+  <a class="btn" href="dashboard.html">← Dashboard</a>
+</div>
+
+<div class="wrap">
+  <div id="content" class="status">กำลังโหลดข้อมูล...</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
+const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });
+
+const TRUCKS = [
+  { plate: '71-9538', driver: 'นายหัวเลย์' },
+  { plate: '72-1620', driver: 'นายหัวปอ' },
+  { plate: '72-2237', driver: 'นายหัวประเสริฐ' },
+  { plate: '72-2420', driver: 'นายหัวบังเฮง' },
+  { plate: '72-2953', driver: 'นายหัวบังฟี' },
+  { plate: '72-3148', driver: 'นายหัวอาคม' }
+];
+const INTERVAL_KM = 20000;
+const WARN_KM = 3000;   // ภายใน 3k km = due soon
+
+const fmt = (n) => Number(n||0).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+const fmtDate = iso => { const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${+y - 543 < 2000 ? +y : +y - 543 + 543}`; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function load() {
+  try {
+    const { data, error } = await ths.from('outcomes')
+      .select('truck_plate,date,amount,note')
+      .eq('category', 'เช็คระยะ')
+      .gte('date', '2024-01-01')
+      .order('date');
+    if (error) throw error;
+    render(data || []);
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="status" style="color:#dc2626">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+// Extract km from note: "393,707 km" → 393707
+function extractKm(note) {
+  const m = (note || '').match(/(\d{3}(?:,\d{3})+|\d{6,})/);
+  if (!m) return null;
+  const km = parseInt(m[1].replace(/,/g, ''));
+  return km >= 100000 ? km : null;
+}
+
+function render(rows) {
+  // กลุ่ม records ต่อรถ (เฉพาะที่ extract km ได้)
+  const byPlate = {};
+  for (const t of TRUCKS) byPlate[t.plate] = [];
+  for (const r of rows) {
+    const km = extractKm(r.note);
+    if (km == null) continue;
+    if (!byPlate[r.truck_plate]) continue;
+    byPlate[r.truck_plate].push({ ...r, km, dateObj: new Date(r.date) });
+  }
+  // เรียงตามวัน
+  for (const p of TRUCKS.map(t => t.plate)) byPlate[p].sort((a,b) => a.dateObj - b.dateObj);
+
+  // คำนวณสถานะแต่ละคัน
+  const today = new Date();
+  const truckStatus = TRUCKS.map(t => {
+    const hist = byPlate[t.plate];
+    if (hist.length === 0) return { ...t, hasData: false };
+    const last = hist[hist.length - 1];
+    const first = hist[0];
+    const daysSpan = Math.max(1, Math.round((last.dateObj - first.dateObj) / 86400000));
+    const kmSpan = last.km - first.km;
+    const kmPerDay = daysSpan > 0 && kmSpan > 0 ? kmSpan / daysSpan : 0;
+    const daysSinceService = Math.round((today - last.dateObj) / 86400000);
+    const estCurrent = last.km + Math.round(kmPerDay * daysSinceService);
+    const dueAt = last.km + INTERVAL_KM;
+    const kmIntoCycle = estCurrent - last.km;
+    const kmLeft = dueAt - estCurrent;
+    const pct = Math.min(150, (kmIntoCycle / INTERVAL_KM) * 100);
+    let status = 'good', statusLabel = 'OK';
+    if (kmLeft < 0) { status = 'bad'; statusLabel = `OVERDUE`; }
+    else if (kmLeft < WARN_KM) { status = 'warn'; statusLabel = 'DUE SOON'; }
+    return {
+      ...t, hasData: true,
+      last, kmPerDay, daysSinceService, estCurrent, dueAt, kmIntoCycle, kmLeft, pct, status, statusLabel,
+      totalServices: hist.length,
+      hist
+    };
+  });
+
+  const overdueCount = truckStatus.filter(t => t.status === 'bad').length;
+  const dueSoonCount = truckStatus.filter(t => t.status === 'warn').length;
+  const okCount = truckStatus.filter(t => t.status === 'good').length;
+  const noDataCount = truckStatus.filter(t => !t.hasData).length;
+
+  // Cost stats
+  const totalCost = rows.reduce((s,r) => s + Number(r.amount||0), 0);
+  const totalCount = rows.length;
+  const avgCost = totalCount > 0 ? totalCost / totalCount : 0;
+  const ytdRows = rows.filter(r => r.date >= '2026-01-01');
+  const ytdCost = ytdRows.reduce((s,r) => s + Number(r.amount||0), 0);
+
+  // Render
+  let html = '';
+
+  // Hero stats
+  html += `
+    <div class="hero">
+      <div class="hero-card ${overdueCount > 0 ? 'bad' : ''}">
+        <div class="label">🔴 Overdue</div>
+        <div class="value num">${overdueCount}</div>
+        <div class="sub">คันเลยกำหนดเช็คระยะ</div>
+      </div>
+      <div class="hero-card ${dueSoonCount > 0 ? 'warn' : ''}">
+        <div class="label">🟡 Due Soon</div>
+        <div class="value num">${dueSoonCount}</div>
+        <div class="sub">เหลือ < ${fmt(WARN_KM)} km</div>
+      </div>
+      <div class="hero-card good">
+        <div class="label">🟢 OK</div>
+        <div class="value num">${okCount}</div>
+        <div class="sub">ตามรอบปกติ</div>
+      </div>
+      <div class="hero-card">
+        <div class="label">🔧 Total Services YTD</div>
+        <div class="value num">${ytdRows.length}</div>
+        <div class="sub">${fmt(ytdCost)} ฿ รวม</div>
+      </div>
+    </div>
+  `;
+
+  // Truck cards
+  html += `<div class="section-title">📋 สถานะแต่ละคัน</div>`;
+  html += `<div class="trucks">`;
+  // Sort: overdue first, then due soon, then good
+  const sortOrder = { bad: 0, warn: 1, good: 2 };
+  const sorted = [...truckStatus].sort((a,b) => {
+    if (!a.hasData) return 1;
+    if (!b.hasData) return -1;
+    return sortOrder[a.status] - sortOrder[b.status];
+  });
+
+  for (const t of sorted) {
+    if (!t.hasData) {
+      html += `
+        <div class="truck-card">
+          <div class="truck-card-header">
+            <div>
+              <div class="truck-plate">${t.plate}</div>
+              <div class="truck-driver">${esc(t.driver)}</div>
+            </div>
+            <div class="status-badge" style="background:#f1f5f9;color:#64748b">NO DATA</div>
+          </div>
+          <div class="truck-body">
+            <div style="color:#94a3b8;font-style:italic;font-size:13px">ยังไม่มี service record ที่อ่าน km ออก</div>
+          </div>
+        </div>
+      `;
+      continue;
+    }
+
+    const fillCls = t.status === 'bad' ? (t.pct >= 100 ? 'overflow' : 'bad') : t.status;
+    const subText = t.kmLeft < 0
+      ? `เลยมาแล้ว <strong>${fmt(Math.abs(t.kmLeft))} km</strong>`
+      : `เหลืออีก <strong>${fmt(t.kmLeft)} km</strong>`;
+    const daysToNext = t.kmPerDay > 0 ? Math.round(t.kmLeft / t.kmPerDay) : null;
+    const daysHint = daysToNext != null
+      ? (daysToNext < 0 ? `(เกินมา ${-daysToNext} วัน)` : `≈ อีก ${daysToNext} วัน`)
+      : '';
+
+    html += `
+      <div class="truck-card">
+        <div class="truck-card-header">
+          <div>
+            <div class="truck-plate">${t.plate}</div>
+            <div class="truck-driver">${esc(t.driver)}</div>
+          </div>
+          <div class="status-badge ${t.status}">${t.statusLabel}</div>
+        </div>
+        <div class="truck-body">
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="lbl">Last service</div>
+              <div class="val">${fmtDate(t.last.date)}</div>
+              <div class="sub">${t.daysSinceService} วันที่แล้ว · ${fmt(t.last.amount)} ฿</div>
+            </div>
+            <div class="info-item">
+              <div class="lbl">Last KM</div>
+              <div class="val num">${fmt(t.last.km)}</div>
+              <div class="sub">${t.totalServices} ครั้งใน DB</div>
+            </div>
+            <div class="info-item">
+              <div class="lbl">Est. current KM</div>
+              <div class="val num">${fmt(t.estCurrent)}</div>
+              <div class="sub">@ ${fmt(t.kmPerDay)} km/วัน</div>
+            </div>
+            <div class="info-item">
+              <div class="lbl">Next service at</div>
+              <div class="val num">${fmt(t.dueAt)}</div>
+              <div class="sub">${daysHint}</div>
+            </div>
+          </div>
+          <div class="progress-section">
+            <div class="progress-label">
+              <span>${fmt(t.kmIntoCycle)} / ${fmt(INTERVAL_KM)} km in cycle</span>
+              <span><strong>${subText}</strong></span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill ${fillCls}" style="width:${Math.min(100, t.pct)}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  html += `</div>`;
+
+  // Cost stats
+  html += `<div class="section-title">💰 Cost Summary</div>`;
+  html += `
+    <div class="stats">
+      <div class="stat-card">
+        <div class="lbl">Total YTD (2026)</div>
+        <div class="val num">${fmt(ytdCost)} ฿</div>
+        <div class="sub">${ytdRows.length} services</div>
+      </div>
+      <div class="stat-card">
+        <div class="lbl">Average per service</div>
+        <div class="val num">${fmt(avgCost)} ฿</div>
+        <div class="sub">เฉลี่ยทั้งฝูง</div>
+      </div>
+      <div class="stat-card">
+        <div class="lbl">Per-km cost estimate</div>
+        <div class="val num">0.59 ฿/km</div>
+        <div class="sub">~12K ฿ ต่อรอบ 20K km</div>
+      </div>
+    </div>
+  `;
+
+  // Full history table
+  html += `<div class="section-title">📅 ประวัติเช็คระยะทั้งหมด (${rows.length} รายการ)</div>`;
+  html += `<div class="table-card"><table>
+    <thead><tr>
+      <th>วันที่</th><th>คัน</th><th class="num">KM</th><th class="num">ค่าใช้จ่าย</th><th>หมายเหตุ</th>
+    </tr></thead>
+    <tbody>`;
+  for (const r of [...rows].reverse()) {
+    const km = extractKm(r.note);
+    html += `<tr>
+      <td>${fmtDate(r.date)}</td>
+      <td><strong>${r.truck_plate}</strong></td>
+      <td class="num">${km ? fmt(km) : '—'}</td>
+      <td class="num">${fmt(r.amount)}</td>
+      <td style="font-size:12px;color:#475569">${esc(r.note || '—')}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  document.getElementById('content').innerHTML = html;
+  document.getElementById('content').className = '';
+}
+
+load();
+</script>
+</body>
+</html>
