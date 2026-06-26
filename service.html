@@ -252,6 +252,18 @@ function render(rows) {
 
   // คำนวณสถานะแต่ละคัน
   const today = new Date();
+  // ── หาค่าเฉลี่ย km/วัน ของทั้งฝูง (ใช้เฉพาะคันที่มี >1 record) เป็น fallback ──
+  let fleetTotalKmPerDay = 0, fleetCount = 0;
+  for (const t of TRUCKS) {
+    const hist = byPlate[t.plate];
+    if (hist.length < 2) continue;
+    const first = hist[0], last = hist[hist.length - 1];
+    const dSpan = Math.max(1, Math.round((last.dateObj - first.dateObj) / 86400000));
+    const kSpan = last.km - first.km;
+    if (kSpan > 0) { fleetTotalKmPerDay += kSpan / dSpan; fleetCount++; }
+  }
+  const fleetAvgKmPerDay = fleetCount > 0 ? fleetTotalKmPerDay / fleetCount : 0;
+
   const truckStatus = TRUCKS.map(t => {
     const hist = byPlate[t.plate];
     if (hist.length === 0) return { ...t, hasData: false };
@@ -259,7 +271,12 @@ function render(rows) {
     const first = hist[0];
     const daysSpan = Math.max(1, Math.round((last.dateObj - first.dateObj) / 86400000));
     const kmSpan = last.km - first.km;
-    const kmPerDay = daysSpan > 0 && kmSpan > 0 ? kmSpan / daysSpan : 0;
+    let kmPerDay = daysSpan > 0 && kmSpan > 0 ? kmSpan / daysSpan : 0;
+    let kmPerDaySource = 'self';
+    if (kmPerDay === 0 && fleetAvgKmPerDay > 0) {
+      kmPerDay = fleetAvgKmPerDay;
+      kmPerDaySource = 'fleet';
+    }
     const daysSinceService = Math.round((today - last.dateObj) / 86400000);
     const estCurrent = last.km + Math.round(kmPerDay * daysSinceService);
     const dueAt = last.km + INTERVAL_KM;
@@ -271,7 +288,7 @@ function render(rows) {
     else if (kmLeft < WARN_KM) { status = 'warn'; statusLabel = 'DUE SOON'; }
     return {
       ...t, hasData: true,
-      last, kmPerDay, daysSinceService, estCurrent, dueAt, kmIntoCycle, kmLeft, pct, status, statusLabel,
+      last, kmPerDay, kmPerDaySource, daysSinceService, estCurrent, dueAt, kmIntoCycle, kmLeft, pct, status, statusLabel,
       totalServices: hist.length,
       hist
     };
@@ -381,7 +398,7 @@ function render(rows) {
             <div class="info-item">
               <div class="lbl">Est. current KM</div>
               <div class="val num">${fmt(t.estCurrent)}</div>
-              <div class="sub">@ ${fmt(t.kmPerDay)} km/วัน</div>
+              <div class="sub">@ ${fmt(t.kmPerDay)} km/วัน${t.kmPerDaySource === 'fleet' ? ' <span style="color:#a78bfa;font-size:10px">(เฉลี่ยฝูง)</span>' : ''}</div>
             </div>
             <div class="info-item">
               <div class="lbl">Next service at</div>
