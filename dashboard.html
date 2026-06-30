@@ -912,14 +912,18 @@ async function loadCache() {
     .neq('truck_plate', '72-2420')
     .order('date_in');
   if (bill2Res.error) throw bill2Res.error;
-  const bill2Monthly = {};
+  // group by period (M.H) — H=1 ถ้า day<=15, ไม่งั้น H=2
+  const bill2Periods = {};
   for (const t of bill2Res.data) {
     if (isBill1(t)) continue;
-    const m = (t.date_in || '').slice(0, 7);
-    if (!m) continue;
-    bill2Monthly[m] = (bill2Monthly[m] || 0) + 1;
+    const d = t.date_in;
+    if (!d) continue;
+    const [y, mo, day] = d.split('-').map(Number);
+    const h = day <= 15 ? 1 : 2;
+    const key = `${y}-${String(mo).padStart(2,'0')}.${h}`;
+    bill2Periods[key] = (bill2Periods[key] || 0) + 1;
   }
-  cache.bill2Monthly = bill2Monthly;
+  cache.bill2Periods = bill2Periods;
   cache.fuelRate = frRes.data.length > 0 ? Number(frRes.data[0].baht_per_liter) : 41.81;
   cache.trucks = tRes.data;
   cache.prices = pRes.data;
@@ -1232,31 +1236,43 @@ function renderOverview(p, allData) {
         ${total.carryBillTotal > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:4px">⏳ เก่า ${fmtBaht(total.carryBillTotal)} + รอบนี้ ${fmtBaht(total.totalPending)}</div>` : ''}
       </div>
       <div class="kpi"><div class="label">% จ่ายแล้ว</div><div class="value">${totalPct}%</div></div>
+      ${(() => {
+        const bp = cache.bill2Periods || {};
+        const totalB2 = Object.values(bp).reduce((s,v)=>s+v, 0);
+        return `<div class="kpi" style="background:#faf5ff;border:1px solid #e9d5ff">
+          <div class="label" style="color:#6b21a8">เที่ยว Bill 2 (เบิกธีรา)</div>
+          <div class="value" style="color:#7c3aed">${totalB2}</div>
+          <div style="font-size:10px;color:#9333ea;margin-top:2px">รวมทุกงวด • ไม่รวม 72-2420</div>
+        </div>`;
+      })()}
     </div>
 
     ${(() => {
-      const monthly = cache.bill2Monthly || {};
-      const months = Object.keys(monthly).sort();
-      if (months.length === 0) return '';
-      const THAI_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      const total = months.reduce((s, m) => s + monthly[m], 0);
-      const cells = months.map(m => {
-        const [y, mo] = m.split('-');
+      const periods = cache.bill2Periods || {};
+      const keys = Object.keys(periods).sort();
+      if (keys.length === 0) return '';
+      const total = keys.reduce((s, k) => s + periods[k], 0);
+      const cells = keys.map(k => {
+        // key = "YYYY-MM.H"
+        const [ym, h] = k.split('.');
+        const [y, mo] = ym.split('-');
         const beYear = String((+y + 543) % 100).padStart(2,'0');
-        return `<div style="text-align:center;padding:8px 10px;background:#f8fafc;border-radius:6px;min-width:75px">
-          <div style="font-size:11px;color:#64748b">${THAI_M[+mo]} ${beYear}</div>
-          <div style="font-size:18px;font-weight:700;color:#7c3aed">${monthly[m]}</div>
+        const label = `${+mo}.${h}/${beYear}`;
+        const isCurrent = (+mo === p.month && +h === p.half && +y === p.year);
+        return `<div style="text-align:center;padding:8px 10px;background:${isCurrent?'#ede9fe':'#f8fafc'};border-radius:6px;min-width:80px;${isCurrent?'border:2px solid #7c3aed':''}">
+          <div style="font-size:11px;color:#64748b">งวด ${label}</div>
+          <div style="font-size:18px;font-weight:700;color:#7c3aed">${periods[k]}</div>
         </div>`;
       }).join('');
       return `
       <div style="margin:12px 0;padding:14px 16px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div>
-            <strong>📅 เที่ยวบิล 2 (อื่นๆ) รายเดือน</strong>
-            <span style="color:#666;margin-left:8px;font-size:12px">ไม่รวม 72-2420 • ใช้เบิกจากธีรา</span>
+            <strong>📅 เที่ยวบิล 2 (อื่นๆ) รายงวด</strong>
+            <span style="color:#666;margin-left:8px;font-size:12px">ไม่รวม 72-2420 • ใช้เบิกจากธีรา • งวดปัจจุบันมีกรอบสีม่วง</span>
           </div>
           <div style="text-align:right">
-            <div style="font-size:11px;color:#64748b">รวมทั้งหมด</div>
+            <div style="font-size:11px;color:#64748b">รวมทุกงวด</div>
             <div style="font-size:20px;font-weight:700;color:#7c3aed">${total}</div>
           </div>
         </div>
