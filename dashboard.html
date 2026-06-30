@@ -906,6 +906,20 @@ async function loadCache() {
   if (mRes.error) throw mRes.error;
   if (fRes.error) throw fRes.error;
   if (frRes.error) throw frRes.error;
+  // ── Bill 2 trips (อื่นๆ) ทั้งหมด ยกเว้น 72-2420 — สำหรับ summary รายเดือน ──
+  const bill2Res = await sba.from('containers')
+    .select('date_in,truck_plate,invoice_no')
+    .neq('truck_plate', '72-2420')
+    .order('date_in');
+  if (bill2Res.error) throw bill2Res.error;
+  const bill2Monthly = {};
+  for (const t of bill2Res.data) {
+    if (isBill1(t)) continue;
+    const m = (t.date_in || '').slice(0, 7);
+    if (!m) continue;
+    bill2Monthly[m] = (bill2Monthly[m] || 0) + 1;
+  }
+  cache.bill2Monthly = bill2Monthly;
   cache.fuelRate = frRes.data.length > 0 ? Number(frRes.data[0].baht_per_liter) : 41.81;
   cache.trucks = tRes.data;
   cache.prices = pRes.data;
@@ -1219,6 +1233,36 @@ function renderOverview(p, allData) {
       </div>
       <div class="kpi"><div class="label">% จ่ายแล้ว</div><div class="value">${totalPct}%</div></div>
     </div>
+
+    ${(() => {
+      const monthly = cache.bill2Monthly || {};
+      const months = Object.keys(monthly).sort();
+      if (months.length === 0) return '';
+      const THAI_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      const total = months.reduce((s, m) => s + monthly[m], 0);
+      const cells = months.map(m => {
+        const [y, mo] = m.split('-');
+        const beYear = String((+y + 543) % 100).padStart(2,'0');
+        return `<div style="text-align:center;padding:8px 10px;background:#f8fafc;border-radius:6px;min-width:75px">
+          <div style="font-size:11px;color:#64748b">${THAI_M[+mo]} ${beYear}</div>
+          <div style="font-size:18px;font-weight:700;color:#7c3aed">${monthly[m]}</div>
+        </div>`;
+      }).join('');
+      return `
+      <div style="margin:12px 0;padding:14px 16px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <strong>📅 เที่ยวบิล 2 (อื่นๆ) รายเดือน</strong>
+            <span style="color:#666;margin-left:8px;font-size:12px">ไม่รวม 72-2420 • ใช้เบิกจากธีรา</span>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:#64748b">รวมทั้งหมด</div>
+            <div style="font-size:20px;font-weight:700;color:#7c3aed">${total}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${cells}</div>
+      </div>`;
+    })()}
 
     <div class="close-fleet-bar" style="margin:12px 0;padding:12px 16px;background:#fff;border-radius:8px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
       <div>
