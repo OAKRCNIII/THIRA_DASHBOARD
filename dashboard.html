@@ -910,7 +910,8 @@ async function loadCache() {
   const bill2Res = await sba.from('containers')
     .select('date_in,truck_plate,invoice_no')
     .neq('truck_plate', '72-2420')
-    .order('date_in');
+    .order('date_in')
+    .limit(50000);
   if (bill2Res.error) throw bill2Res.error;
   // group by period (M.H) — H=1 ถ้า day<=15, ไม่งั้น H=2
   const bill2Periods = {};
