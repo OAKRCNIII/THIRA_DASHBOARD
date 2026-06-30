@@ -906,10 +906,11 @@ async function loadCache() {
   if (mRes.error) throw mRes.error;
   if (fRes.error) throw fRes.error;
   if (frRes.error) throw frRes.error;
-  // ── Bill 2 trips (อื่นๆ) ทั้งหมด ยกเว้น 72-2420 — สำหรับ summary รายเดือน ──
+  // ── Bill 2 trips (อื่นๆ) ของฝูง THIRA ยกเว้น 72-2420 — สำหรับ summary รายงวด ──
+  const thiraPlates = tRes.data.map(t => t.plate).filter(p => p !== '72-2420' && p !== 'XX-XXXX');
   const bill2Res = await sba.from('containers')
     .select('date_in,truck_plate,invoice_no')
-    .neq('truck_plate', '72-2420')
+    .in('truck_plate', thiraPlates)
     .order('date_in')
     .limit(50000);
   if (bill2Res.error) throw bill2Res.error;
