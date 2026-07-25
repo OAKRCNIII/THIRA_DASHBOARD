@@ -430,10 +430,13 @@ function parsePeriod(s) {
 }
 
 // BILL 1 = OGM(A) + KNT ทุกแบบ  (OGM(J), OGM(Yang), ฯลฯ → BILL 2)
+// แก๊ง "ไม่หัก ณ ที่จ่าย" — prefix ที่ค่าขนส่งไม่ต้องหัก 1% (ตรงกับ TR_NOWHT ใน index.html)
+const BILL1_PREFIXES = ['KNT', 'HFI', 'KTW'];
+
 function isBill1(trip) {
   const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
-  if (inv.startsWith('KNT')) return true;
   if (inv.startsWith('OGM(A)')) return true;
+  if (BILL1_PREFIXES.some(p => inv.startsWith(p))) return true;
   return false;
 }
 
@@ -794,7 +797,7 @@ function showDetail(plate) {
     <div class="detail-section">
       <h3>📋 วางบิล ANTS</h3>
       <div class="detail-row">
-        <span class="lbl">บิล 1 (OGM+KNT)</span>
+        <span class="lbl">บิล 1 (OGM+KNT+HFI+KTW)</span>
         <span class="val">${fmtBahtFull(sum.bill1)} · จ่าย ${sum.bill1PaidCnt}/${sum.bill1Cnt}</span>
       </div>
       <div class="detail-row">
