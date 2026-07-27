@@ -440,6 +440,31 @@ function isBill1(trip) {
   return false;
 }
 
+// เบอร์ตู้ถูกใช้ซ้ำข้ามรอบ — จับคู่ด้วย container_no อย่างเดียวจะไปเจอบิลเก่าของตู้ใบเดิม
+// กัน 2 ชั้น: อินวอยซ์ต้องตรง + บิลต้องไม่ลงวันก่อนวันวิ่ง
+function billMatchesTrip(bill, trip) {
+  const norm = s => String(s || '').toUpperCase().replace(/\s+/g, '');
+  if (norm(bill.invoice_no) !== norm(trip.invoice_no)) return false;
+  if (bill.bill_date && trip.date_in && bill.bill_date < trip.date_in) return false;
+  return true;
+}
+
+function buildBillStatus(bills, trips) {
+  const byCnt = {};
+  for (const b of bills) {
+    if (!byCnt[b.container_no]) byCnt[b.container_no] = [];
+    byCnt[b.container_no].push(b);
+  }
+  const out = {};
+  for (const t of trips) {
+    const list = byCnt[t.container_no];
+    if (!list) continue;
+    const hit = list.find(b => billMatchesTrip(b, t));
+    if (hit) out[t.container_no] = hit;
+  }
+  return out;
+}
+
 // Parse Thai date e.g. "อัพเดต 17 มีนาคม 2569" → "2026-03-17"
 function parseThaiDate(text) {
   const m = String(text || '').match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
@@ -530,8 +555,8 @@ async function fetchTruckData(plate, p) {
     const cntNos = [...trips.data, ...carryRes.data].map(t => t.container_no).filter(Boolean);
     if (cntNos.length > 0) {
       try {
-        const r = await ants.from('transport_bills').select('container_no,bill_no,price,is_paid').in('container_no', cntNos);
-        if (r.data) r.data.forEach(b => billStatus[b.container_no] = b);
+        const r = await ants.from('transport_bills').select('container_no,invoice_no,bill_no,price,is_paid,bill_date').in('container_no', cntNos);
+        if (r.data) billStatus = buildBillStatus(r.data, [...trips.data, ...carryRes.data]);
       } catch(e){}
     }
   }

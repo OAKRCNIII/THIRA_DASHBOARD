@@ -891,6 +891,33 @@ function isBill1(trip) {
   return false;                                  // OGM(J), OGM(Yang), OGM(B)... → BILL 2
 }
 
+// เบอร์ตู้ถูกใช้ซ้ำข้ามรอบ — ถ้าจับคู่บิลด้วย container_no อย่างเดียว ตู้ที่วนกลับมาวิ่งใหม่
+// จะไปเจอบิลเก่าของตัวเอง แล้วโชว์ว่าวางบิลแล้ว + ดึงราคาเก่ามาใช้ (เคส OOCU8234290 21/7/2026)
+// กัน 2 ชั้น: อินวอยซ์ต้องตรง + บิลต้องไม่ลงวันก่อนวันวิ่ง
+function billMatchesTrip(bill, trip) {
+  const norm = s => String(s || '').toUpperCase().replace(/\s+/g, '');
+  if (norm(bill.invoice_no) !== norm(trip.invoice_no)) return false;
+  if (bill.bill_date && trip.date_in && bill.bill_date < trip.date_in) return false;
+  return true;
+}
+
+// map เบอร์ตู้ → บิลที่เป็นของเที่ยวนั้นจริงเท่านั้น
+function buildBillStatus(bills, trips) {
+  const byCnt = {};
+  for (const b of bills) {
+    if (!byCnt[b.container_no]) byCnt[b.container_no] = [];
+    byCnt[b.container_no].push(b);
+  }
+  const out = {};
+  for (const t of trips) {
+    const list = byCnt[t.container_no];
+    if (!list) continue;
+    const hit = list.find(b => billMatchesTrip(b, t));
+    if (hit) out[t.container_no] = hit;
+  }
+  return out;
+}
+
 // ─── Data fetch ────────────────────────────────────────────
 async function loadCache() {
   if (cache.trucks) return;
@@ -987,9 +1014,7 @@ async function fetchTruckPeriod(plate, start, end, year, month, half) {
         .select('container_no,invoice_no,bill_no,price,source,is_paid,bill_date')
         .in('container_no', allContainerNos);
       if (!billsRes.error) {
-        billsRes.data.forEach(b => {
-          billStatusByCnt[b.container_no] = b;
-        });
+        billStatusByCnt = buildBillStatus(billsRes.data, [...trips.data, ...carryRes.data]);
       }
     } catch (e) { console.warn('ANTS fetch failed (continue without paid status):', e); }
   }
