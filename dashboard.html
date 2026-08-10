@@ -833,6 +833,22 @@ function parsePeriod(periodStr) {
 
 function formatPeriod(year, month, half) { return `${month}.${half}/${year}`; }
 
+// วันที่วันนี้แบบ YYYY-MM-DD ตามเวลาเครื่อง
+// (ห้ามใช้ toISOString() — มันแปลงเป็น UTC ทำให้ก่อน 7 โมงเช้าได้วันที่ย้อนไป 1 วัน)
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// วันที่ตั้งต้นของช่องกรอก — วันนี้ถ้าอยู่ในรอบ, ไม่งั้นชนขอบรอบที่ใกล้ที่สุด
+// (เช่น วันนี้ 10/8 แต่กรอกย้อนรอบ 7.2 → ได้ 31/7 ซึ่งเป็นวันสุดท้ายของรอบ)
+function defaultPeriodDate(p) {
+  const today = todayISO();
+  if (today < p.start) return p.start;   // รอบยังไม่ถึง → วันแรกของรอบ
+  if (today > p.end)   return p.end;     // รอบผ่านไปแล้ว → วันสุดท้ายของรอบ
+  return today;                          // อยู่ในรอบ → วันนี้
+}
+
 // priceMap[code] = [prices sorted by effective_date desc]
 // ถ้าส่ง tripDate มา → เลือก row ล่าสุดที่ effective_date <= tripDate
 // ถ้าไม่ส่ง → ใช้ตัวล่าสุด (default behavior แบบเก่า)
@@ -2320,7 +2336,7 @@ function addBatchRow(kind, presetPlate, presetDate, presetData) {
     || (cache.trucks && cache.trucks[0] && cache.trucks[0].plate)
     || '';
   const p = parsePeriod(document.getElementById('period-input').value);
-  const date = presetDate || p.start;
+  const date = presetDate || defaultPeriodDate(p);
   const truckCell = `<td><select id="${kind}-plate-${rid}">${_truckOpts(plate)}</select></td>`;
   const dateCell = `<td><input type="date" id="${kind}-date-${rid}" required min="${p.start}" max="${p.end}" value="${date}"></td>`;
   const delBtn = `<td><button type="button" class="del-btn" onclick="removeBatchRow('${kind}', ${rid})">×</button></td>`;
