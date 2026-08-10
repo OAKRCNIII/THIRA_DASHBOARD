@@ -148,11 +148,24 @@ export async function tryHandleTruckSelection(
   text: string,
   reply: (msgs: any[]) => Promise<void>
 ): Promise<boolean> {
-  // หา pending ที่ user รอตอบ
+  // หา pending ที่ user รอตอบ — เอาเฉพาะที่ยังใหม่
+  // ถ้าไม่จำกัดเวลา บิลที่ค้างไว้ไม่ได้เลือกรถจะดูดข้อความทุกอันไปตอบว่า "ไม่รู้จักทะเบียน" ตลอดไป
+  // แล้วบอทจะคุยเรื่องอื่น (เช่น ถามค่าขนส่ง) ไม่ได้เลย
+  const PENDING_TTL_HOURS = 6;
+  const cutoff = new Date(Date.now() - PENDING_TTL_HOURS * 3600_000).toISOString();
+
+  // บิลค้างที่เกินเวลาแล้ว → ปิดทิ้ง ไม่ให้มาขวางข้อความถัดไป
+  await sb.schema("thira").from("line_pending_bills")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("line_user_id", userId)
+    .in("status", ["awaiting_truck", "awaiting_edit"])
+    .lt("created_at", cutoff);
+
   const { data: pending } = await sb
     .schema("thira").from("line_pending_bills")
     .select("*").eq("line_user_id", userId)
     .in("status", ["awaiting_truck", "awaiting_edit"])
+    .gte("created_at", cutoff)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!pending) return false;
 
@@ -188,7 +201,8 @@ export async function tryHandleTruckSelection(
   if (!plate) {
     await reply([{
       type: "text",
-      text: `❓ ไม่รู้จักทะเบียน "${text}" — กรุณาแตะปุ่ม`,
+      text: `❓ ยังมีบิลค้างอยู่ รอเลือกรถก่อน — แตะปุ่มด้านล่าง\n`
+        + `ถ้าจะคุยเรื่องอื่น (เช่น ถามค่าขนส่ง) แตะ "❌ ยกเลิก" ก่อน`,
       quickReply: {
         items: [
           ...truckQuickReplyItems(),
