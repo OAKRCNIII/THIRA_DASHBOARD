@@ -22,12 +22,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Note: whitelist ย้ายไปอยู่ใน DB table `bot_users` แล้ว — env ALLOWED_LINE_USERS ไม่ใช้แล้ว
 
-// Sonnet 4.5 เป็นรุ่นเก่า (legacy) — รับได้เฉพาะพารามิเตอร์แบบเดิม
-// ห้ามส่ง output_config.effort (รุ่นนี้ error) และ thinking แบบ adaptive (มีตั้งแต่ 4.6 ขึ้นไป)
-// ถ้าเปลี่ยนกลับเป็นรุ่นใหม่ (claude-sonnet-5 / claude-opus-5) ให้เปิด 2 บรรทัดล่างคืนด้วย
-const ANTHROPIC_MODEL = "claude-sonnet-4-5";
+// เปลี่ยนโมเดลได้ที่บรรทัดเดียวนี้ — ตัว ANTHROPIC_MODERN ข้างล่างจะเปิด/ปิด
+// thinking + effort ให้เองตามรุ่น (รุ่นเก่าอย่าง sonnet-4-5 / haiku-4-5 ส่งไปจะ error)
+const ANTHROPIC_MODEL = "claude-sonnet-5";
 const ANTHROPIC_MODERN = /^(claude-(opus|sonnet|fable|mythos)-5|claude-opus-4-[678]|claude-sonnet-4-6)/.test(ANTHROPIC_MODEL);
-const ANTHROPIC_EFFORT = "medium"; // ใช้เฉพาะรุ่นใหม่ — low = เร็ว/ถูก, high = ฉลาดขึ้นแต่ช้าลง
+const ANTHROPIC_EFFORT = "low"; // งานนี้แค่เลือก tool ให้ถูก ไม่ต้องคิดลึก — low ถูกและเร็วสุด
 const FIXED_COST_STANDARD = 20600;
 const FIXED_COST_RAIL = 20976; // +6% ค่ารถไฟ
 // Report HTML served from GitHub Pages (Supabase edge functions force text/plain for no-jwt funcs)
