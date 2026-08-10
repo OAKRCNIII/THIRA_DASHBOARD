@@ -748,8 +748,12 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
 ตอบ JSON เท่านั้น ห้ามมีข้อความอื่น`;
 
   const res = await callClaudeWithRetry({
-    model: "claude-sonnet-4-5",
-    max_tokens: 800,
+    // Opus 5 — อ่านลายมือแม่นกว่าเดิมมาก และรับภาพความละเอียดสูงได้ถึง 2576px
+    // คิดก่อนตอบเป็นค่าเริ่มต้น ช่วยเรื่องเลขที่เขียนกำกวม (0/3/5/8) โดยเฉพาะ
+    model: "claude-opus-5",
+    // max_tokens คุมทั้งส่วนที่คิดและ JSON ที่ตอบรวมกัน — 800 ไม่พอ คำตอบจะขาดกลางคัน
+    max_tokens: 8000,
+    output_config: { effort: "high" }, // ลดเป็น medium ได้ถ้าอยากให้ตอบเร็ว/ถูกลง
     messages: [{
       role: "user",
       content: [
@@ -764,7 +768,9 @@ async function ocrBillImage(base64: string): Promise<OcrResult> {
     throw new Error(`Claude API ${res.status}: ${err.slice(0, 200)}`);
   }
   const data = await res.json();
-  const textOut = data.content?.[0]?.text || "{}";
+  // ต้องหาบล็อกชนิด text เอา ห้ามใช้ content[0] เฉยๆ
+  // เพราะเมื่อโมเดลคิดก่อนตอบ บล็อกแรกจะเป็นส่วนที่คิด ไม่ใช่คำตอบ (จะได้ JSON ว่างทุกใบ)
+  const textOut = data.content?.find((b: any) => b.type === "text")?.text || "{}";
   // strip code fences if Claude wraps in ```json
   const cleaned = textOut.replace(/```json\s*/, "").replace(/```\s*$/, "").trim();
   let parsed: OcrResult;
