@@ -754,16 +754,29 @@
 // ─── Config ────────────────────────────────────────────────
 const SUPABASE_URL = 'https://eurnevjtzxansothqney.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
-// ANTS billing project (อีก project — optional) — ใช้เช็คว่า ANTS จ่ายบิลรึยัง
-// ⚠️ ไม่บังคับ — ถ้าไม่ใส่ key ก็ใช้งานได้ปกติ แค่ไม่เห็นสถานะ "ANTS จ่ายแล้ว"
+// ── ANTS billing project (คนละ project) — ใช้เช็คว่า ANTS วางบิลรึยัง ──
+// ตาราง transport_bills เปิดให้อ่านเฉพาะผู้ใช้ที่ล็อกอินแล้ว (RLS: role authenticated)
+// publishable key เพียวๆ อ่านไม่ได้ และ secret key ใช้ในเบราว์เซอร์ไม่ได้ (Supabase บล็อก)
+// → ต้องล็อกอินด้วยบัญชี ANTS แบบเดียวกับแดชบอร์ด ANTS ตัวหลัก
 const ANTS_URL = 'https://ywslgrusflfuxtrtvlfu.supabase.co';
-let ANTS_KEY = localStorage.getItem('ANTS_KEY') || '';
-window.setAntsKey = function() {
-  const k = prompt('🔑 ใส่ ANTS Supabase key (เก็บไว้ใน browser เครื่องนี้เท่านั้น):\n— ถามคุณ RCN ถ้าไม่รู้ — กด Cancel เพื่อข้าม', ANTS_KEY || '');
-  if (k === null) return;
-  ANTS_KEY = k.trim();
-  if (ANTS_KEY) localStorage.setItem('ANTS_KEY', ANTS_KEY);
-  else localStorage.removeItem('ANTS_KEY');
+const ANTS_PUBLISHABLE = 'sb_publishable_nrjNNyA08-GCRphIQuzvvg_YpGxiYeY';
+let antsAuthError = '';   // ข้อความบอก user เวลาอ่านสถานะบิลไม่ได้
+
+window.setAntsKey = async function() {
+  const { data: { session } } = await ants.auth.getSession();
+  if (session) {
+    if (confirm(`ล็อกอิน ANTS อยู่แล้วในชื่อ ${session.user.email}\n\nกด OK เพื่อออกจากระบบ ANTS`)) {
+      await ants.auth.signOut();
+      location.reload();
+    }
+    return;
+  }
+  const email = prompt('🔑 ล็อกอิน ANTS เพื่อดูสถานะวางบิล\n\nอีเมล (บัญชีเดียวกับแดชบอร์ด ANTS):');
+  if (!email) return;
+  const pass = prompt('รหัสผ่าน:');
+  if (!pass) return;
+  const { error } = await ants.auth.signInWithPassword({ email: email.trim(), password: pass });
+  if (error) { alert('❌ ล็อกอินไม่สำเร็จ: ' + error.message); return; }
   location.reload();
 };
 const TRUCK_PLATES = ['71-9538', '72-1620', '72-2237', '72-2420', '72-2953', '72-3148'];
@@ -803,8 +816,10 @@ const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   db: { schema: 'ants' }
 });
-// ANTS billing project client
-const ants = ANTS_KEY ? supabase.createClient(ANTS_URL, ANTS_KEY) : null;
+// ANTS billing project client — session เก็บไว้ ต่ออายุ token ให้เอง
+const ants = supabase.createClient(ANTS_URL, ANTS_PUBLISHABLE, {
+  auth: { persistSession: true, autoRefreshToken: true, storageKey: 'thira_ants_auth' }
+});
 
 // ─── Utility ───────────────────────────────────────────────
 const fmtBaht = (n, dflt='—') => (n == null || n === 0) ? dflt : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -1029,10 +1044,20 @@ async function fetchTruckPeriod(plate, start, end, year, month, half) {
       const billsRes = await ants.from('transport_bills')
         .select('container_no,invoice_no,bill_no,price,source,is_paid,bill_date')
         .in('container_no', allContainerNos);
-      if (!billsRes.error) {
+      if (billsRes.error) {
+        // อ่านไม่ได้ = ทุกเที่ยวจะกลายเป็น "ยังไม่วางบิล" ซึ่งหลอกตา — ต้องเตือนให้เห็น
+        antsAuthError = /permission|denied|JWT|apikey|401/i.test(billsRes.error.message || '')
+          ? 'ยังไม่ได้ล็อกอิน ANTS'
+          : (billsRes.error.message || 'อ่านข้อมูลไม่ได้');
+        console.warn('ANTS transport_bills:', billsRes.error);
+      } else {
+        antsAuthError = '';
         billStatusByCnt = buildBillStatus(billsRes.data, [...trips.data, ...carryRes.data]);
       }
-    } catch (e) { console.warn('ANTS fetch failed (continue without paid status):', e); }
+    } catch (e) {
+      antsAuthError = e.message || 'เชื่อมต่อ ANTS ไม่ได้';
+      console.warn('ANTS fetch failed:', e);
+    }
   }
 
   // Filter carry trips → เฉพาะที่ยังไม่จ่าย (ไม่มี bill_no ใน ANTS)
@@ -1264,6 +1289,19 @@ function renderOverview(p, allData) {
         <div class="period-sub">${p.halfLabel}</div>
       </div>
     </div>
+
+    ${antsAuthError ? `
+      <div style="margin:12px 0;padding:14px 16px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #d03b3b;border-radius:8px">
+        <div style="font-weight:700;color:#991b1b;margin-bottom:4px">⚠️ อ่านสถานะวางบิลจาก ANTS ไม่ได้ (${esc(antsAuthError)})</div>
+        <div style="font-size:13px;color:#7f1d1d;line-height:1.7">
+          ตัวเลข <b>จ่ายแล้ว · ค้างชำระ · % จ่าย · เที่ยวค้างเก่า</b> ในหน้านี้<b>ยังเชื่อไม่ได้</b>
+          เพราะระบบมองว่าทุกเที่ยวยังไม่ได้วางบิล<br>
+          ส่วนเที่ยววิ่ง · ค่าน้ำมัน · รายจ่าย · รายรับ ยังถูกต้องตามปกติ<br>
+          <button onclick="setAntsKey()" style="margin-top:8px;padding:7px 16px;background:#991b1b;color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;font-family:inherit">
+            🔑 ล็อกอิน ANTS
+          </button>
+        </div>
+      </div>` : ''}
 
     <div class="overview-kpis">
       <div class="kpi">
