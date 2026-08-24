@@ -784,11 +784,19 @@ const THAI_MONTHS = ['', 'ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.
 const THAI_MONTHS_FULL = ['', 'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 // BILL 1 = OGM(A) เท่านั้น + KNT ทุกแบบ
 //   OGM(J), OGM(Yang), OGM(B), ฯลฯ → BILL 2 (อื่นๆ)
+// เบิกเงินเดือนล่วงหน้า — เงินที่จ่ายคนขับก่อนสิ้นเดือน
+// เงินออกจริงวันที่เบิก แล้วไปหักออกจากเงินเดือนตอนสิ้นเดือน (ผูกกับ "เดือน" ไม่ใช่ "รอบ")
+// เบิกรวมทั้งเดือนต้องไม่เกิน trucks.monthly_salary
+const SALARY_ADVANCE_CAT = 'เบิกเงินเดือนล่วงหน้า';
+// หมวดที่ถือเป็น "เงินจ่ายคนขับ" — แยกออกจากค่าใช้จ่ายอื่นๆ ในรายงาน
+const DRIVER_PAY_CATS = ['ค่าเที่ยวคนขับ', 'ค่าล่วง', 'เงินเดือน', SALARY_ADVANCE_CAT];
+
 const OUTCOME_CATEGORIES = [
   'ค่าน้ำมัน',          // ต้องกรอก ลิตร + บาท
   'ค่าเที่ยวคนขับ',     // บาท
   'ค่าล่วง',
   'เงินเดือน',
+  SALARY_ADVANCE_CAT,
   'ค่ายาง',
   'เช็คระยะ',
   'ค่าเคลียหมวดกร',
@@ -1066,9 +1074,18 @@ async function fetchTruckPeriod(plate, start, end, year, month, half) {
     return !(b && b.bill_no);   // ไม่มี ANTS bill record หรือ ANTS ยังไม่วางบิล → ค้าง
   });
 
+  // เบิกเงินเดือนล่วงหน้า — ดึงทั้งเดือน (ไม่ใช่แค่ในรอบ) เพราะเงินเดือนคิดเป็นรายเดือน
+  const mStart = `${year}-${String(month).padStart(2, '0')}-01`;
+  const mEnd = `${year}-${String(month).padStart(2, '0')}-${lastDayOfMonth(year, month)}`;
+  const advRes = await ths.from('outcomes')
+    .select('id,date,amount,note')
+    .eq('truck_plate', plate).eq('category', SALARY_ADVANCE_CAT)
+    .gte('date', mStart).lte('date', mEnd).order('date');
+
   return {
     trips: trips.data, outs: outs.data, incs: incs.data, fp: fp.data,
-    billStatusByCnt, extras: extras.data, carryUnpaid
+    billStatusByCnt, extras: extras.data, carryUnpaid,
+    advances: advRes.error ? [] : (advRes.data || [])
   };
 }
 
@@ -1443,7 +1460,7 @@ function renderOverview(p, allData) {
   `;
 }
 
-function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, carryUnpaid) {
+function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, carryUnpaid, advances) {
   const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   billStatusByCnt = billStatusByCnt || {};
   extras = extras || [];
@@ -1513,8 +1530,8 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
 
   // Outcomes split
   const refills = outs.filter(o => o.category === 'ค่าน้ำมัน');
-  const paidDriver = outs.filter(o => ['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
-  const otherCosts = outs.filter(o => o.category !== 'ค่าน้ำมัน' && !['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
+  const paidDriver = outs.filter(o => DRIVER_PAY_CATS.includes(o.category));
+  const otherCosts = outs.filter(o => o.category !== 'ค่าน้ำมัน' && !DRIVER_PAY_CATS.includes(o.category));
 
   let refillL = 0, refillB = 0;
   const refillRows = refills.map(r => {
@@ -1553,12 +1570,13 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
   });
   if (otherCosts.length === 0) otherRows.push('<tr class="row-other"><td class="cat">ค่าใช้จ่ายอื่นๆ</td><td colspan="8" class="empty">— ไม่มีค่าใช้จ่ายอื่นรอบนี้ —</td></tr>');
 
-  let driverFeePaid = 0, driverOT = 0, driverSalLogged = 0;
+  let driverFeePaid = 0, driverOT = 0, driverSalLogged = 0, advInPeriod = 0;
   const paidRows = paidDriver.map(d => {
     const amt = Number(d.amount);
     if (d.category === 'ค่าเที่ยวคนขับ') driverFeePaid += amt;
     if (d.category === 'ค่าล่วง') driverOT += amt;
     if (d.category === 'เงินเดือน') driverSalLogged += amt;
+    if (d.category === SALARY_ADVANCE_CAT) advInPeriod += amt;
     return `<tr class="row-paid">
       <td class="cat">จ่ายคนขับ</td>
       <td>${fmtThaiDate(d.date)}</td>
@@ -1570,7 +1588,8 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
       <td class="num">—</td><td class="num">—</td>
       <td class="num">${d.category === 'ค่าเที่ยวคนขับ' ? fmtBaht(amt) : '—'}</td>
       <td class="num">${d.category === 'ค่าล่วง' ? fmtBaht(amt) : '—'}</td>
-      <td class="num">${d.category === 'เงินเดือน' ? fmtBaht(amt) : '—'}</td>
+      <td class="num">${d.category === 'เงินเดือน' ? fmtBaht(amt)
+        : d.category === SALARY_ADVANCE_CAT ? `<span style="color:#c05621">เบิก ${fmtBaht(amt)}</span>` : '—'}</td>
       <td class="num">—</td>
     </tr>`;
   });
@@ -1582,10 +1601,16 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
   const salaryDue = p.half === 2 ? baseSal : 0;
   const driverSalary = driverSalLogged > 0 ? driverSalLogged : salaryDue;
 
-  const totalCost = refillB + otherTotal + driverFeePaid + driverOT + driverSalLogged;
+  // เบิกล่วงหน้าทั้งเดือน — ต้องดูทั้งเดือน ไม่ใช่แค่ในรอบ
+  // เพราะเบิกครึ่งเดือนแรก (X.1) ต้องไปหักตอนจ่ายเงินเดือนสิ้นเดือน (X.2)
+  const advTotal = (advances || []).reduce((s, a) => s + Number(a.amount || 0), 0);
+  const advRemaining = Math.max(0, baseSal - advTotal);       // เบิกได้อีกเท่าไหร่เดือนนี้
+  const salaryNet = Math.max(0, driverSalary - advTotal);      // เงินเดือนที่ยังต้องโอน
+
+  const totalCost = refillB + otherTotal + driverFeePaid + driverOT + driverSalLogged + advInPeriod;
   const profit = incomeNet - totalCost;
   const fuelVar = refillL - tripTarget;
-  const payslipTotal = tripFee + driverOT + driverSalary;
+  const payslipTotal = tripFee + driverOT + salaryNet;
 
   let matchMsg = '';
   if (driverFeePaid > 0) {
@@ -1843,8 +1868,16 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
         <div class="lbl">ค่าเที่ยว (จาก ${trips.length} เที่ยว × PRICE)</div><div class="val">${fmtBaht(tripFee)}</div>
         <div class="lbl">ค่าล่วง</div><div class="val">${driverOT > 0 ? fmtBaht(driverOT) : '—'}</div>
         <div class="lbl">เงินเดือน ${p.half === 2 ? `base (${fmtBaht(baseSal)} ต่อเดือน — จ่ายครึ่งหลัง)` : '(ครึ่งแรก — รอจ่ายครึ่งหลัง)'}</div><div class="val">${driverSalary > 0 ? fmtBaht(driverSalary) : '—'}</div>
+        ${advTotal > 0 ? `
+        <div class="lbl" style="color:#c05621">หักเบิกล่วงหน้า (${(advances || []).map(a => fmtThaiDate(a.date)).join(', ')})</div>
+        <div class="val" style="color:#c05621">−${fmtBaht(advTotal)}</div>` : ''}
         <div class="lbl">อื่นๆ ที่จ่ายคนขับ</div><div class="val">—</div>
         <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(payslipTotal)} บ.</div>
+      </div>
+      <div style="margin-top:10px;font-size:12.5px;color:${advRemaining === 0 ? '#c05621' : '#52514e'}">
+        โควตาเบิกล่วงหน้าเดือน ${THAI_MONTHS[p.month]}:
+        เบิกไปแล้ว <b>${fmtBaht(advTotal)}</b> จาก ${fmtBaht(baseSal)}
+        ${advRemaining === 0 ? '· <b>เบิกครบแล้ว เบิกเพิ่มไม่ได้</b>' : `· เบิกได้อีก <b>${fmtBaht(advRemaining)}</b>`}
       </div>
       ${matchMsg}
     </div>
@@ -1899,7 +1932,7 @@ async function reload() {
       if (!truck) throw new Error(`ไม่พบรถ ${currentPlate}`);
       setStatus(`โหลดข้อมูล ${currentPlate} รอบ ${currentPeriod}...`);
       const data = await fetchTruckPeriod(currentPlate, p.start, p.end, p.year, p.month, p.half);
-      document.getElementById('report').innerHTML = renderReport(truck, p, data.trips, data.outs, data.incs, data.fp, data.billStatusByCnt, data.extras, data.carryUnpaid);
+      document.getElementById('report').innerHTML = renderReport(truck, p, data.trips, data.outs, data.incs, data.fp, data.billStatusByCnt, data.extras, data.carryUnpaid, data.advances);
     }
     setStatus(null);
   } catch (e) {
@@ -2536,6 +2569,36 @@ async function saveOtherBatch(start, end) {
     items.push({truck_plate: plate, date, category, liters: null, amount, note});
   }
   if (items.length === 0) { setError('ไม่มีแถวที่กรอกครบ'); return; }
+
+  // ── ลิมิตเบิกเงินเดือนล่วงหน้า: รวมทั้งเดือนห้ามเกินเงินเดือนของรถคันนั้น ──
+  const advItems = items.filter(i => i.category === SALARY_ADVANCE_CAT);
+  if (advItems.length > 0) {
+    // รวมยอดที่กำลังจะบันทึก แยกตาม รถ+เดือน (กรอกหลายแถวพร้อมกันก็ต้องนับรวม)
+    const pending = {};
+    for (const i of advItems) {
+      const k = `${i.truck_plate}|${i.date.slice(0, 7)}`;
+      pending[k] = (pending[k] || 0) + Number(i.amount);
+    }
+    for (const key of Object.keys(pending)) {
+      const [plate, ym] = key.split('|');
+      const tk = (cache.trucks || []).find(t => t.plate === plate);
+      const limit = Number((tk && tk.monthly_salary) || 0);
+      const [yy, mm] = ym.split('-').map(Number);
+      const ex = await ths.from('outcomes').select('amount')
+        .eq('truck_plate', plate).eq('category', SALARY_ADVANCE_CAT)
+        .gte('date', `${ym}-01`).lte('date', `${ym}-${lastDayOfMonth(yy, mm)}`);
+      if (ex.error) { setError('เช็คยอดเบิกไม่สำเร็จ: ' + ex.error.message); return; }
+      const already = (ex.data || []).reduce((s, r) => s + Number(r.amount), 0);
+      const total = already + pending[key];
+      if (total > limit + 0.01) {
+        setError(`${plate}: เบิกเกินโควตา — เดือน ${THAI_MONTHS[mm]} เบิกไปแล้ว ${fmtBaht(already)}`
+          + ` + ที่กรอก ${fmtBaht(pending[key])} = ${fmtBaht(total)} เกินเงินเดือน ${fmtBaht(limit)}`
+          + ` (เบิกได้อีกไม่เกิน ${fmtBaht(Math.max(0, limit - already))})`);
+        return;
+      }
+    }
+  }
+
   try {
     const r = await ths.from('outcomes').insert(items);
     if (r.error) throw r.error;
