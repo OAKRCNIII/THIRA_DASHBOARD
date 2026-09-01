@@ -283,7 +283,6 @@ function computePay(truck, p, data) {
   // ── หักเบิกเงินเดือนล่วงหน้า (จ่ายไปแล้วระหว่างเดือน) ──
   const advances = data.advances || [];
   const advTotal = advances.reduce((s, a) => s + Number(a.amount || 0), 0);
-  const advRemaining = Math.max(0, baseSal - advTotal);
   // หักจากเงินเดือนเต็ม (salaryDue) เสมอ — ถ้าหักจากยอดที่บันทึกจ่ายจริง (ซึ่งอาจสุทธิอยู่แล้ว) จะหักซ้ำ
   const salaryNet = Math.max(0, salaryDue - advTotal);
   const payslipTotal = tripFee + driverOT + salaryNet;
@@ -301,7 +300,7 @@ function computePay(truck, p, data) {
 
   return {
     tripFee, tripTarget, driverFeePaid, driverOT, driverSalary, baseSal,
-    advances, advTotal, advRemaining, salaryNet,
+    advances, advTotal, salaryNet,
     payslipTotal, tripCount: data.trips.length,
     fuelOpen, fuelCarry, refillL, refillB, extraL, fuelBonus
   };
@@ -478,10 +477,6 @@ function renderTruckPage(truck, p, data, pay) {
             <div class="lbl">อื่นๆ</div><div class="val">—</div>
             <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(pay.payslipTotal)} บ.</div>
           </div>
-          ${pay.baseSal > 0 ? `<div style="margin-top:8px;font-size:11px;color:${pay.advRemaining === 0 ? '#c05621' : '#666'}">
-            โควตาเบิกล่วงหน้าเดือนนี้: เบิกไปแล้ว <b>${fmtBaht(pay.advTotal)}</b> จาก ${fmtBaht(pay.baseSal)}
-            ${pay.advRemaining === 0 ? '· <b>เบิกครบแล้ว</b>' : `· เบิกได้อีก <b>${fmtBaht(pay.advRemaining)}</b>`}
-          </div>` : ''}
         </div>
 
         <!-- ⛽ Fuel pill (มุมเล็กๆ) — เริ่มต้น = ค่าเดิม (ติดลบ = หนี้), ยกไป = ค้างปัจจุบัน -->
