@@ -698,6 +698,8 @@
     .truck-report { transform: none !important; width: auto !important; }
     /* ซ่อน sub-info (ลิตรชุด/เงินเดือน) ตอนพิมพ์ — ใน report ไม่ต้องการ */
     .truck-report .header .driver { display: none !important; }
+    /* โควตาเบิกล่วงหน้า = ตัวช่วยตอนกรอก ไม่ต้องติดไปบนใบที่ยื่นให้คนขับ */
+    .adv-quota { display: none !important; }
 
     .header { border-radius: 0; box-shadow: none; }
     table { box-shadow: none !important; border: 1px solid #ddd !important; }
@@ -1882,7 +1884,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
         <div class="lbl">อื่นๆ ที่จ่ายคนขับ</div><div class="val">—</div>
         <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(payslipTotal)} บ.</div>
       </div>
-      <div style="margin-top:10px;font-size:12.5px;color:${advRemaining === 0 ? '#c05621' : '#52514e'}">
+      <div class="adv-quota" style="margin-top:10px;font-size:12.5px;color:${advRemaining === 0 ? '#c05621' : '#52514e'}">
         โควตาเบิกล่วงหน้าเดือน ${THAI_MONTHS[p.month]}:
         เบิกไปแล้ว <b>${fmtBaht(advTotal)}</b> จาก ${fmtBaht(baseSal)}
         ${advRemaining === 0 ? '· <b>เบิกครบแล้ว เบิกเพิ่มไม่ได้</b>' : `· เบิกได้อีก <b>${fmtBaht(advRemaining)}</b>`}
