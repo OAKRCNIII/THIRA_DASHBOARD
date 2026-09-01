@@ -183,6 +183,9 @@ const fmtLiter = (n, dflt='—') => (n == null || n === 0) ? dflt : Math.round(N
 const fmtDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${y}`; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// เบิกเงินเดือนล่วงหน้า — จ่ายคนขับก่อนสิ้นเดือน ต้องหักตอนโอนเงินเดือน (ไม่งั้นจ่ายซ้ำ)
+const SALARY_ADVANCE_CAT = 'เบิกเงินเดือนล่วงหน้า';
+
 function getCurrentPeriod() {
   const t = new Date();
   return `${t.getMonth()+1}.${t.getDate() < 16 ? 1 : 2}/${t.getFullYear()}`;
@@ -237,19 +240,26 @@ function lookupPrice(factory, invoice, tripDate) {
 }
 
 async function fetchTruckData(plate, p) {
-  const [trips, outs, incs, extras, fp] = await Promise.all([
+  // เบิกเงินเดือนล่วงหน้า — ต้องดึงทั้งเดือน ไม่ใช่แค่ในรอบ
+  // เบิกตอน X.1 ก็ต้องมาหักตอนจ่ายเงินเดือนสิ้นเดือน (X.2) ไม่งั้นจ่ายซ้ำ
+  const mStart = `${p.year}-${String(p.month).padStart(2,'0')}-01`;
+  const mEnd   = `${p.year}-${String(p.month).padStart(2,'0')}-${lastDay(p.year, p.month)}`;
+  const [trips, outs, incs, extras, fp, adv] = await Promise.all([
     sba.from('containers').select('*').eq('truck_plate', plate).gte('date_in', p.start).lte('date_in', p.end).order('date_in'),
     ths.from('outcomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date'),
     ths.from('incomes').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end),
     ths.from('extra_trips').select('*').eq('truck_plate', plate).gte('date', p.start).lte('date', p.end).order('date'),
-    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', p.year).eq('month', p.month).eq('half', p.half).maybeSingle()
+    ths.from('fuel_periods').select('*').eq('truck_plate', plate).eq('year', p.year).eq('month', p.month).eq('half', p.half).maybeSingle(),
+    ths.from('outcomes').select('id,date,amount,note').eq('truck_plate', plate)
+       .eq('category', SALARY_ADVANCE_CAT).gte('date', mStart).lte('date', mEnd).order('date')
   ]);
   return {
     trips: trips.data || [],
     outs: outs.data || [],
     incs: incs.data || [],
     extras: extras.data || [],
-    fp: fp.data || null
+    fp: fp.data || null,
+    advances: adv.error ? [] : (adv.data || [])
   };
 }
 
@@ -269,7 +279,14 @@ function computePay(truck, p, data) {
   const baseSal = Number(truck.monthly_salary || 0);
   const salaryDue = p.half === 2 ? baseSal : 0;
   const driverSalary = driverSalLogged > 0 ? driverSalLogged : salaryDue;
-  const payslipTotal = tripFee + driverOT + driverSalary;
+
+  // ── หักเบิกเงินเดือนล่วงหน้า (จ่ายไปแล้วระหว่างเดือน) ──
+  const advances = data.advances || [];
+  const advTotal = advances.reduce((s, a) => s + Number(a.amount || 0), 0);
+  const advRemaining = Math.max(0, baseSal - advTotal);
+  // หักจากเงินเดือนเต็ม (salaryDue) เสมอ — ถ้าหักจากยอดที่บันทึกจ่ายจริง (ซึ่งอาจสุทธิอยู่แล้ว) จะหักซ้ำ
+  const salaryNet = Math.max(0, salaryDue - advTotal);
+  const payslipTotal = tripFee + driverOT + salaryNet;
 
   // ── Fuel summary ──
   const refills = data.outs.filter(o => o.category === 'ค่าน้ำมัน');
@@ -284,6 +301,7 @@ function computePay(truck, p, data) {
 
   return {
     tripFee, tripTarget, driverFeePaid, driverOT, driverSalary, baseSal,
+    advances, advTotal, advRemaining, salaryNet,
     payslipTotal, tripCount: data.trips.length,
     fuelOpen, fuelCarry, refillL, refillB, extraL, fuelBonus
   };
@@ -291,9 +309,10 @@ function computePay(truck, p, data) {
 
 function renderSummaryPage(p, summaries) {
   const periodLabel = `${THAI_FULL[p.month]} ${p.year + 543} — ${p.halfLabel}`;
-  let grandTotal = 0;
+  let grandTotal = 0, grandAdv = 0;
   const rows = summaries.map(s => {
     grandTotal += s.pay.payslipTotal;
+    grandAdv += s.pay.advTotal;
     return `<tr>
       <td class="plate">${esc(s.truck.plate)}</td>
       <td>${esc(s.truck.driver_name)}</td>
@@ -301,6 +320,7 @@ function renderSummaryPage(p, summaries) {
       <td class="num">${fmtBaht(s.pay.tripFee)}</td>
       <td class="num">${s.pay.driverOT > 0 ? fmtBaht(s.pay.driverOT) : '—'}</td>
       <td class="num">${s.pay.driverSalary > 0 ? fmtBaht(s.pay.driverSalary) : '—'}</td>
+      <td class="num" style="color:${s.pay.advTotal > 0 ? '#c05621' : 'inherit'}">${s.pay.advTotal > 0 ? '−' + fmtBaht(s.pay.advTotal) : '—'}</td>
       <td class="num"><strong>${fmtBaht(s.pay.payslipTotal)}</strong></td>
     </tr>`;
   }).join('');
@@ -319,16 +339,20 @@ function renderSummaryPage(p, summaries) {
             <th class="num">ค่าเที่ยว</th>
             <th class="num">ค่าล่วง</th>
             <th class="num">เงินเดือน</th>
+            <th class="num">หักเบิกล่วงหน้า</th>
             <th class="num">รวมต้องโอน</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
-          <tr><td colspan="6">💼 รวมต้องโอนทั้งฝูง (6 คน)</td><td class="num">${fmtBaht(grandTotal)} บ.</td></tr>
+          <tr><td colspan="6">💼 รวมต้องโอนทั้งฝูง (${summaries.length} คน)</td>
+              <td class="num" style="color:${grandAdv > 0 ? '#c05621' : 'inherit'}">${grandAdv > 0 ? '−' + fmtBaht(grandAdv) : '—'}</td>
+              <td class="num">${fmtBaht(grandTotal)} บ.</td></tr>
         </tfoot>
       </table>
       <div style="margin-top:14px;font-size:12px;color:#666">
-        💡 รอบ .2 (ครึ่งหลังของเดือน) จะรวม เงินเดือน base • ใช้สำหรับโอนเงินเข้าบัญชีคนขับ
+        💡 รอบ .2 (ครึ่งหลังของเดือน) จะรวม เงินเดือน base • ใช้สำหรับโอนเงินเข้าบัญชีคนขับ<br>
+        💡 ยอด "รวมต้องโอน" หักเงินเบิกล่วงหน้าที่จ่ายไปแล้วระหว่างเดือนออกให้แล้ว
       </div>
     </div>
   </div>
@@ -379,7 +403,7 @@ function renderTruckPage(truck, p, data, pay) {
   </tr>`).join('') || '<tr class="row-fuel"><td class="cat">ค่าน้ำมัน</td><td colspan="8" style="color:#888;text-align:center">— ไม่มีการเติมน้ำมัน —</td></tr>';
 
   // Other costs
-  const others = data.outs.filter(o => o.category !== 'ค่าน้ำมัน' && !['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category));
+  const others = data.outs.filter(o => o.category !== 'ค่าน้ำมัน' && !['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน',SALARY_ADVANCE_CAT].includes(o.category));
   const otherRows = others.map(o => `<tr class="row-other">
     <td class="cat">อื่นๆ</td>
     <td>${fmtDate(o.date)}</td>
@@ -389,8 +413,9 @@ function renderTruckPage(truck, p, data, pay) {
   </tr>`).join('');
 
   // Driver paid
-  const paidRows = data.outs.filter(o => ['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน'].includes(o.category)).map(d => {
+  const paidRows = data.outs.filter(o => ['ค่าเที่ยวคนขับ','ค่าล่วง','เงินเดือน',SALARY_ADVANCE_CAT].includes(o.category)).map(d => {
     const amt = Number(d.amount);
+    const isAdv = d.category === SALARY_ADVANCE_CAT;
     return `<tr class="row-paid">
       <td class="cat">จ่ายคน</td>
       <td>${fmtDate(d.date)}</td>
@@ -399,7 +424,7 @@ function renderTruckPage(truck, p, data, pay) {
       <td class="num">${d.category === 'ค่าเที่ยวคนขับ' ? fmtBaht(amt) : '—'}</td>
       <td class="num">${d.category === 'ค่าล่วง' ? fmtBaht(amt) : '—'}</td>
       <td class="num">${d.category === 'เงินเดือน' ? fmtBaht(amt) : '—'}</td>
-      <td class="num">—</td>
+      <td class="num"${isAdv ? ' style="color:#c05621"' : ''}>${isAdv ? fmtBaht(amt) : '—'}</td>
     </tr>`;
   }).join('');
 
@@ -447,9 +472,16 @@ function renderTruckPage(truck, p, data, pay) {
             <div class="lbl">ค่าเที่ยว (${pay.tripCount} เที่ยว)</div><div class="val">${fmtBaht(pay.tripFee)}</div>
             <div class="lbl">ค่าล่วง</div><div class="val">${pay.driverOT > 0 ? fmtBaht(pay.driverOT) : '—'}</div>
             <div class="lbl">เงินเดือน ${p.half === 2 ? `(${fmtBaht(pay.baseSal)}/เดือน)` : '(ครึ่งแรก — รอ)'}</div><div class="val">${pay.driverSalary > 0 ? fmtBaht(pay.driverSalary) : '—'}</div>
+            ${pay.advTotal > 0 ? `
+            <div class="lbl" style="color:#c05621">หักเบิกล่วงหน้า (${pay.advances.map(a => fmtDate(a.date)).join(', ')})</div>
+            <div class="val" style="color:#c05621">−${fmtBaht(pay.advTotal)}</div>` : ''}
             <div class="lbl">อื่นๆ</div><div class="val">—</div>
             <div class="lbl total">💼 รวมรอบนี้</div><div class="val total">${fmtBaht(pay.payslipTotal)} บ.</div>
           </div>
+          ${pay.baseSal > 0 ? `<div style="margin-top:8px;font-size:11px;color:${pay.advRemaining === 0 ? '#c05621' : '#666'}">
+            โควตาเบิกล่วงหน้าเดือนนี้: เบิกไปแล้ว <b>${fmtBaht(pay.advTotal)}</b> จาก ${fmtBaht(pay.baseSal)}
+            ${pay.advRemaining === 0 ? '· <b>เบิกครบแล้ว</b>' : `· เบิกได้อีก <b>${fmtBaht(pay.advRemaining)}</b>`}
+          </div>` : ''}
         </div>
 
         <!-- ⛽ Fuel pill (มุมเล็กๆ) — เริ่มต้น = ค่าเดิม (ติดลบ = หนี้), ยกไป = ค้างปัจจุบัน -->

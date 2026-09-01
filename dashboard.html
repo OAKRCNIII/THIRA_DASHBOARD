@@ -922,9 +922,16 @@ function billPriceForTrip(trip, factoryMap, priceSets) {
 // แก๊ง "ไม่หัก ณ ที่จ่าย" — prefix ที่ค่าขนส่งไม่ต้องหัก 1% (ตรงกับ TR_NOWHT ใน index.html)
 const BILL1_PREFIXES = ['KNT', 'HFI', 'KTW'];
 
+// อินวอยซ์ที่หัวเข้าข่ายบิล 1 แต่คุณ RCN สั่งให้ไปอยู่บิล 2 เป็นรายใบ
+// เขียนแบบลบ space แล้ว ตัวพิมพ์ใหญ่ (เทียบกับ inv ที่ normalize แล้ว)
+const BILL2_EXCEPTIONS = new Set([
+  'KNT(JANG2)017/2026',
+]);
+
 function isBill1(trip) {
   // ลบ space ทั้งหมดเพื่อจับ "OGM(A)" / "OGM (A)" / "OGM( A )" ให้เหมือนกัน
   const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  if (BILL2_EXCEPTIONS.has(inv)) return false;   // ยกเว้นรายใบ — ชนะทุกกติกาข้างล่าง
   if (inv.startsWith('OGM(A)')) return true;    // เฉพาะ OGM(A) เท่านั้น
   if (BILL1_PREFIXES.some(p => inv.startsWith(p))) return true;
   return false;                                  // OGM(J), OGM(Yang), OGM(B)... → BILL 2
@@ -1605,7 +1612,8 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
   // เพราะเบิกครึ่งเดือนแรก (X.1) ต้องไปหักตอนจ่ายเงินเดือนสิ้นเดือน (X.2)
   const advTotal = (advances || []).reduce((s, a) => s + Number(a.amount || 0), 0);
   const advRemaining = Math.max(0, baseSal - advTotal);       // เบิกได้อีกเท่าไหร่เดือนนี้
-  const salaryNet = Math.max(0, driverSalary - advTotal);      // เงินเดือนที่ยังต้องโอน
+  // หักจากเงินเดือนเต็ม (salaryDue) เสมอ — ถ้าไปหักจาก driverSalLogged ซึ่งอาจเป็นยอดสุทธิที่โอนจริงไปแล้ว จะหักซ้ำ
+  const salaryNet = Math.max(0, salaryDue - advTotal);         // เงินเดือนที่ยังต้องโอน
 
   const totalCost = refillB + otherTotal + driverFeePaid + driverOT + driverSalLogged + advInPeriod;
   const profit = incomeNet - totalCost;

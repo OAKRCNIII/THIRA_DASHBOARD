@@ -416,6 +416,9 @@ const fmtLiter = (n, d='—') => (n == null || n === 0) ? d : Math.round(Number(
 const fmtDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}/${+m}/${y}`; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// เบิกเงินเดือนล่วงหน้า — จ่ายก่อนสิ้นเดือน ต้องหักตอนโอนเงินเดือน ไม่งั้นจ่ายซ้ำ
+const SALARY_ADVANCE_CAT = 'เบิกเงินเดือนล่วงหน้า';
+
 function setStatus(msg) { const s=document.getElementById('status'); if(msg){s.textContent=msg;s.style.display='';}else{s.style.display='none';} }
 function setError(msg) { const e=document.getElementById('error'); if(msg){e.textContent='❌ '+msg;e.style.display='';}else{e.style.display='none';} }
 
@@ -433,8 +436,14 @@ function parsePeriod(s) {
 // แก๊ง "ไม่หัก ณ ที่จ่าย" — prefix ที่ค่าขนส่งไม่ต้องหัก 1% (ตรงกับ TR_NOWHT ใน index.html)
 const BILL1_PREFIXES = ['KNT', 'HFI', 'KTW'];
 
+// อินวอยซ์ที่หัวเข้าข่ายบิล 1 แต่สั่งให้ไปอยู่บิล 2 เป็นรายใบ (normalize แล้ว: ไม่มี space, ตัวใหญ่)
+const BILL2_EXCEPTIONS = new Set([
+  'KNT(JANG2)017/2026',
+]);
+
 function isBill1(trip) {
   const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  if (BILL2_EXCEPTIONS.has(inv)) return false;   // ยกเว้นรายใบ — ชนะทุกกติกาข้างล่าง
   if (inv.startsWith('OGM(A)')) return true;
   if (BILL1_PREFIXES.some(p => inv.startsWith(p))) return true;
   return false;
@@ -567,9 +576,17 @@ async function fetchTruckData(plate, p) {
     return !(b && b.bill_no);
   });
 
+  // เบิกเงินเดือนล่วงหน้า — ดึงทั้งเดือน เพราะเบิกรอบ X.1 ต้องหักตอนจ่ายเงินเดือน X.2
+  const mStart = `${p.year}-${String(p.month).padStart(2,'0')}-01`;
+  const mEnd   = `${p.year}-${String(p.month).padStart(2,'0')}-${new Date(p.year, p.month, 0).getDate()}`;
+  const advRes = await ths.from('outcomes').select('id,date,amount,note')
+    .eq('truck_plate', plate).eq('category', SALARY_ADVANCE_CAT)
+    .gte('date', mStart).lte('date', mEnd).order('date');
+
   return {
     trips: trips.data, outs: outs.data, incs: incs.data,
-    extras: extras.data, fp: fp.data, billStatus, carryUnpaid
+    extras: extras.data, fp: fp.data, billStatus, carryUnpaid,
+    advances: advRes.error ? [] : (advRes.data || [])
   };
 }
 
@@ -619,7 +636,11 @@ function compute(truck, p, d) {
   const profit = income - outcome;
   const baseSal = Number(truck.monthly_salary||0);
   const salaryDue = p.half === 2 ? baseSal : 0;
-  const driverFee = tripFee + salaryDue;
+  // หักเบิกเงินเดือนล่วงหน้าที่จ่ายไปแล้วระหว่างเดือน (ไม่งั้นจ่ายซ้ำ)
+  const advTotal = (d.advances || []).reduce((s, a) => s + Number(a.amount || 0), 0);
+  const advRemaining = Math.max(0, baseSal - advTotal);
+  const salaryNet = Math.max(0, salaryDue - advTotal);
+  const driverFee = tripFee + salaryNet;
 
   const totalBill = bill1 + bill2;
   const totalPaid = bill1Paid + bill2Paid;
@@ -634,7 +655,8 @@ function compute(truck, p, d) {
     // Grand totals (รวมรอบนี้ + carryover)
     grandTotalBill: totalBill + carryBillTotal,
     grandTotalPending: totalPending + carryBillTotal,
-    income, outcome, profit, baseSal, driverFee, carryIn, carryOut
+    income, outcome, profit, baseSal, driverFee, carryIn, carryOut,
+    advTotal, advRemaining, salaryNet, advances: d.advances || []
   };
 }
 
@@ -856,10 +878,15 @@ function showDetail(plate) {
       <h3>💼 จ่ายคนขับรอบนี้</h3>
       <div class="detail-row"><span class="lbl">ค่าเที่ยว (${sum.trips} เที่ยว)</span><span class="val">${fmtBahtFull(sum.tripFee)}</span></div>
       <div class="detail-row"><span class="lbl">เงินเดือน ${p.half===2?'(จ่ายครึ่งหลัง)':'(รอครึ่งหลัง)'}</span><span class="val">${fmtBahtFull(p.half===2?sum.baseSal:0)}</span></div>
+      ${sum.advTotal>0?`<div class="detail-row"><span class="lbl" style="color:#c05621">หักเบิกล่วงหน้า</span><span class="val" style="color:#c05621">−${fmtBahtFull(sum.advTotal)}</span></div>`:''}
       <div class="detail-row total">
         <span class="lbl">รวมจ่าย</span>
         <span class="val">${fmtBahtFull(sum.driverFee)} บ.</span>
       </div>
+      ${sum.baseSal>0?`<div style="font-size:11px;color:${sum.advRemaining===0?'#c05621':'#78716c'};margin-top:6px">
+        โควตาเบิกล่วงหน้าเดือนนี้: เบิกแล้ว ${fmtBahtFull(sum.advTotal)} จาก ${fmtBahtFull(sum.baseSal)}
+        ${sum.advRemaining===0?'· <b>เบิกครบแล้ว</b>':`· เบิกได้อีก <b>${fmtBahtFull(sum.advRemaining)}</b>`}
+      </div>`:''}
     </div>
 
     <div class="detail-section">
