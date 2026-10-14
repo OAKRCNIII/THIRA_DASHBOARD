@@ -167,6 +167,14 @@ const BILL1 = ['OGM', 'KNT'];
 const ths = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'thira' } });
 const sba = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'ants' } });
 
+// โปรเจกต์ ANTS (คนละตัวกับ FREIGHT_CALC) — ใช้อ่าน invoices.port ว่าอินวอยซ์ไหนอยู่ท่าไหน
+// ใช้ storageKey เดียวกับ dashboard.html → ถ้าล็อกอินที่แดชบอร์ดไว้แล้ว หน้านี้ใช้ session เดิมได้เลย
+const ANTS_URL = 'https://ywslgrusflfuxtrtvlfu.supabase.co';
+const ANTS_PUBLISHABLE = 'sb_publishable_nrjNNyA08-GCRphIQuzvvg_YpGxiYeY';
+const antsProj = supabase.createClient(ANTS_URL, ANTS_PUBLISHABLE, {
+  auth: { persistSession: true, autoRefreshToken: true, storageKey: 'thira_ants_auth' }
+});
+
 // iPad/iOS detect — แสดง tip การพิมพ์
 (function detectIPad() {
   const ua = navigator.userAgent;
@@ -229,14 +237,37 @@ async function loadCache() {
   }
   cache.factoryMap = {};
   mRes.data.forEach(r => cache.factoryMap[r.prefix] = r.factory_name);
+
+  // map อินวอยซ์ → ท่า (ANTS invoices.port) · อ่านไม่ได้ = ถือเป็นปาดังหมด (พฤติกรรมเดิม)
+  cache.portByInvoice = {};
+  try {
+    const invRes = await antsProj.from('invoices').select('invoice_no,port').limit(50000);
+    if (invRes.error) throw invRes.error;
+    for (const r of invRes.data || []) {
+      const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+      if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+    }
+  } catch (e) {
+    console.warn('อ่าน invoices.port ไม่ได้ — ถือเป็นปาดังทั้งหมด:', e.message || e);
+  }
 }
 
-function lookupPrice(factory, invoice, tripDate) {
+// ท่าที่รับ/คืนตู้ — โรงงานเดียวกันคนละท่า = คนละลิตร/ค่าเที่ยว (บ้านส้อง ปาดัง 210 ล. vs สงขลา 180 ล.)
+const DEFAULT_PORT = 'PADANG';
+function portOfTrip(trip) {
+  const inv = String(trip && trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  return (cache.portByInvoice && cache.portByInvoice[inv]) || DEFAULT_PORT;
+}
+
+// ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิม)
+function lookupPrice(factory, invoice, tripDate, port) {
   const key = factory || (invoice || '').slice(0, 3);
   const list = cache.priceMap[key];
   if (!list || list.length === 0) return null;
-  if (!tripDate) return list[0];
-  return list.find(p => p.effective_date <= tripDate) || null;
+  const want = port || DEFAULT_PORT;
+  const inDate = p => !tripDate || p.effective_date <= tripDate;
+  const atPort = pt => list.find(p => (p.port || DEFAULT_PORT) === pt && inDate(p)) || null;
+  return atPort(want) || (want !== DEFAULT_PORT ? atPort(DEFAULT_PORT) : null);
 }
 
 async function fetchTruckData(plate, p) {
@@ -267,7 +298,7 @@ function computePay(truck, p, data) {
   const fuelCol = truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   let tripFee = 0, tripTarget = 0;
   for (const t of data.trips) {
-    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in);
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in, portOfTrip(t));
     if (pr) {
       tripFee += Number(pr.fee_driver || 0);
       tripTarget += Number(pr[fuelCol] || 0);
@@ -364,7 +395,7 @@ function renderTruckPage(truck, p, data, pay) {
 
   // Trip rows
   const tripRows = data.trips.map(t => {
-    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in);
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in, portOfTrip(t));
     const target = pr ? Number(pr[fuelCol] || 0) : 0;
     const fee = pr ? Number(pr.fee_driver || 0) : 0;
     const label = t.factory || `[${(t.invoice_no||'').slice(0,3)}] ${t.invoice_no || ''}`;

@@ -116,6 +116,7 @@ def load_prices():
             'destination_code': dest,
             'destination_name': factory,
             'factory_origin': factory,
+            'port': 'PADANG',        # ชีท PRICE เป็นเรตปาดัง — เรตท่าอื่นกรอกตรงใน Supabase
             'fee_driver': to_num(r[3]) or 0,
             'fuel_liters_route_1': to_num(r[4]),
             'fuel_liters_route_2': to_num(r[5]),
@@ -253,7 +254,9 @@ def push(supa, schema, table, rows, chunk_size=500, upsert_on=None):
 
 TABLES = {
     # name → (schema, table, loader, upsert_on)
-    'prices':              ('thira',  'prices',              load_prices,              'destination_code,factory_origin'),
+    # conflict target ต้องตรง constraint prices_dest_date_port_unique
+    # load_prices ไม่ส่ง port มา → ลงเป็น PADANG ตาม default ฉะนั้นแถวสงขลาที่กรอกมือไว้จะไม่ถูกทับ
+    'prices':              ('thira',  'prices',              load_prices,              'destination_code,factory_origin,effective_date,port'),
     'fuel_rates':          ('thira',  'fuel_rates',          load_fuel_rates,          'effective_date'),
     'incomes':             ('thira',  'incomes',             load_incomes,             None),
     'outcomes':            ('thira',  'outcomes',            load_outcomes,            None),

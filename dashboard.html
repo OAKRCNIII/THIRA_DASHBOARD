@@ -874,16 +874,28 @@ function defaultPeriodDate(p) {
   return today;                          // อยู่ในรอบ → วันนี้
 }
 
-// priceMap[code] = [prices sorted by effective_date desc]
-// ถ้าส่ง tripDate มา → เลือก row ล่าสุดที่ effective_date <= tripDate
-// ถ้าไม่ส่ง → ใช้ตัวล่าสุด (default behavior แบบเก่า)
-function lookupPrice(priceMap, factory, invoice, tripDate) {
+// ── ท่าที่รับ/คืนตู้ ──
+// โรงงานเดียวกันคนละท่า = คนละระยะ คนละลิตร คนละค่าเที่ยว (เช่น บ้านส้อง ปาดัง 210 ล. vs สงขลา 180 ล.)
+// ท่าอยู่ที่ระดับอินวอยซ์ฝั่ง ANTS (invoices.port) ไม่ได้อยู่ที่ตู้ → ดึงมาทำ map ตอน loadCache
+const DEFAULT_PORT = 'PADANG';
+function portOfTrip(trip) {
+  const inv = String(trip && trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  return (cache.portByInvoice && cache.portByInvoice[inv]) || DEFAULT_PORT;
+}
+
+// priceMap[code] = [prices sorted by effective_date desc] (รวมทุกท่าไว้ด้วยกัน)
+// เลือก row ล่าสุดที่ port ตรง + effective_date <= tripDate
+// ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิมของระบบ)
+// ไม่ส่ง tripDate → ใช้ตัวล่าสุดของท่านั้น (default behavior แบบเก่า)
+function lookupPrice(priceMap, factory, invoice, tripDate, port) {
   const key = factory || (invoice || '').slice(0, 3);
   const list = priceMap[key];
   if (!list || list.length === 0) return { price: null, key };
-  if (!tripDate) return { price: list[0], key };  // ตัวล่าสุด
-  const price = list.find(p => p.effective_date <= tripDate) || null;
-  return { price, key };
+  const want = port || DEFAULT_PORT;
+  const inDate = p => !tripDate || p.effective_date <= tripDate;
+  const atPort = pt => list.find(p => (p.port || DEFAULT_PORT) === pt && inDate(p)) || null;
+  const price = atPort(want) || (want !== DEFAULT_PORT ? atPort(DEFAULT_PORT) : null);
+  return { price, key, port: want, fellBackToPadang: !!(price && (price.port || DEFAULT_PORT) !== want) };
 }
 
 // Parse Thai date from freight_price_sets.name field
@@ -929,6 +941,7 @@ const BILL1_PREFIXES = ['KNT', 'HFI', 'KTW'];
 const BILL2_EXCEPTIONS = new Set([
   'KNT(JANG2)017/2026',
   'KNT(JANG2)019/2026',
+  'KNT(JANG2)021/2026',
 ]);
 
 function isBill1(trip) {
@@ -1026,6 +1039,21 @@ async function loadCache() {
     .map(ps => ({ ...ps, effective_date: parseThaiDate(ps.name) }))
     .filter(ps => ps.effective_date)
     .sort((a, b) => b.effective_date.localeCompare(a.effective_date));
+
+  // ── map อินวอยซ์ → ท่า (ANTS invoices.port) ──
+  // ต้องล็อกอิน ANTS ก่อน (ปุ่ม 🔑) ถ้าอ่านไม่ได้ก็ถือว่าเป็นปาดังหมด = พฤติกรรมเดิม ไม่พัง
+  cache.portByInvoice = {};
+  try {
+    const invRes = await ants.from('invoices').select('invoice_no,port').limit(50000);
+    if (invRes.error) throw invRes.error;
+    for (const r of invRes.data || []) {
+      const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+      if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+    }
+  } catch (e) {
+    cache.portError = e.message || String(e);
+    console.warn('อ่าน invoices.port ไม่ได้ — ถือเป็นปาดังทั้งหมด:', cache.portError);
+  }
   setStatus(null);
 }
 
@@ -1156,7 +1184,7 @@ function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extr
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0;
   let bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
   for (const t of trips) {
-    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in);
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t));
     if (price) {
       tripTarget += Number(price[fuelCol] || 0);
       tripFee += Number(price.fee_driver || 0);
@@ -1494,7 +1522,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
   let bill1Total = 0, bill2Total = 0, bill1Paid = 0, bill2Paid = 0;
   const bill1Trips = [], bill2Trips = [];
   const tripRows = trips.map(t => {
-    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in);
+    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t));
     const target = price ? Number(price[fuelCol] || 0) : 0;
     const fee = price ? Number(price.fee_driver || 0) : 0;
     tripTarget += target;
@@ -2162,7 +2190,7 @@ function renderInput(p, plate, data) {
   const fuelCol = truck && truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   let tripTarget = 0;
   for (const t of (data.trips || [])) {
-    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in);
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t));
     if (price) tripTarget += Number(price[fuelCol] || 0);
   }
   const extraL = (data.extras || []).reduce((s, e) => s + Number(e.liters || 0), 0);

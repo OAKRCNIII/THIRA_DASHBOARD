@@ -440,6 +440,7 @@ const BILL1_PREFIXES = ['KNT', 'HFI', 'KTW'];
 const BILL2_EXCEPTIONS = new Set([
   'KNT(JANG2)017/2026',
   'KNT(JANG2)019/2026',
+  'KNT(JANG2)021/2026',
 ]);
 
 function isBill1(trip) {
@@ -535,14 +536,40 @@ async function loadCache() {
     .map(ps => ({ ...ps, effective_date: parseThaiDate(ps.name) }))
     .filter(ps => ps.effective_date)
     .sort((a, b) => b.effective_date.localeCompare(a.effective_date));
+
+  // map อินวอยซ์ → ท่า (ANTS invoices.port) · อ่านไม่ได้ = ถือเป็นปาดังหมด (พฤติกรรมเดิม)
+  cache.portByInvoice = {};
+  if (ants) {
+    try {
+      const invRes = await ants.from('invoices').select('invoice_no,port').limit(50000);
+      if (invRes.error) throw invRes.error;
+      for (const r of invRes.data || []) {
+        const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+        if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+      }
+    } catch (e) {
+      console.warn('อ่าน invoices.port ไม่ได้ — ถือเป็นปาดังทั้งหมด:', e.message || e);
+    }
+  }
 }
 
-function lookupPrice(factory, invoice, tripDate) {
+// ท่าที่รับ/คืนตู้ — โรงงานเดียวกันคนละท่า = คนละลิตร/ค่าเที่ยว (บ้านส้อง ปาดัง 210 ล. vs สงขลา 180 ล.)
+// ท่าอยู่ระดับอินวอยซ์ฝั่ง ANTS (invoices.port) ดึงมาทำ map ตอน loadCache
+const DEFAULT_PORT = 'PADANG';
+function portOfTrip(trip) {
+  const inv = String(trip && trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+  return (cache.portByInvoice && cache.portByInvoice[inv]) || DEFAULT_PORT;
+}
+
+// ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิม)
+function lookupPrice(factory, invoice, tripDate, port) {
   const key = factory || (invoice||'').slice(0,3);
   const list = cache.priceMap[key];
   if (!list || list.length === 0) return null;
-  if (!tripDate) return list[0];
-  return list.find(p => p.effective_date <= tripDate) || null;
+  const want = port || DEFAULT_PORT;
+  const inDate = p => !tripDate || p.effective_date <= tripDate;
+  const atPort = pt => list.find(p => (p.port || DEFAULT_PORT) === pt && inDate(p)) || null;
+  return atPort(want) || (want !== DEFAULT_PORT ? atPort(DEFAULT_PORT) : null);
 }
 
 async function fetchTruckData(plate, p) {
@@ -597,7 +624,7 @@ function compute(truck, p, d) {
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0, bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
 
   for (const t of d.trips) {
-    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in);
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in, portOfTrip(t));
     if (pr) { tripTarget += Number(pr[fuelCol]||0); tripFee += Number(pr.fee_driver||0); }
     const ab = d.billStatus[t.container_no];
     const isPaid = !!(ab && ab.bill_no);
@@ -802,7 +829,7 @@ function showDetail(plate) {
   const profitClass = sum.profit >= 0 ? 'pos' : 'neg';
 
   const tripList = d.trips.slice(0, 10).map(tr => {
-    const pr = lookupPrice(tr.factory, tr.invoice_no, tr.date_in);
+    const pr = lookupPrice(tr.factory, tr.invoice_no, tr.date_in, portOfTrip(tr));
     const fee = pr ? Number(pr.fee_driver||0) : 0;
     const label = tr.factory || (tr.invoice_no||'').slice(0,12);
     return `<div class="detail-list-item">
