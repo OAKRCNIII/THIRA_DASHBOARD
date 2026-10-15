@@ -64,7 +64,9 @@ def run_sync():
     log(f"🔄 เริ่ม sync...")
     try:
         result = subprocess.run(
-            [sys.executable, str(SYNC_SCRIPT), "--local", str(WATCH_FILE)],
+            # --source excel: watcher เห็นแค่ชีท DATABASE (ปาดัง) → sync จะแทนที่เฉพาะ PADANG
+            # ตู้สงขลา/แหลมฉบังที่ cron ดึงมาจาก ANTS จะไม่ถูกลบทิ้ง
+            [sys.executable, str(SYNC_SCRIPT), "--source", "excel", "--local", str(WATCH_FILE)],
             capture_output=True,
             text=True,
             encoding="utf-8",
