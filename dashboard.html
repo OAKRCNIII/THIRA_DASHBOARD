@@ -888,6 +888,19 @@ function portOfTrip(trip) {
 
 // priceMap[code] = [prices sorted by effective_date desc] (รวมทุกท่าไว้ด้วยกัน)
 // เลือก row ล่าสุดที่ port ตรง + effective_date <= tripDate
+// ป้ายบอกท่าต่อท้ายชื่อโรงงาน — ปาดังเป็นค่าปกติจึงไม่ติดป้าย เห็นเฉพาะท่าที่ต่างออกไป
+const PORT_BADGE = {
+  SONGKHLA: { text: 'สงขลา',   bg: '#0e7490', fg: '#ffffff' },
+  LCB:      { text: 'แหลมฉบัง', bg: '#7c3aed', fg: '#ffffff' },
+};
+function portBadge(trip) {
+  const b = PORT_BADGE[portOfTrip(trip)];
+  if (!b) return '';
+  return ` <span style="display:inline-block;background:${b.bg};color:${b.fg};font-size:10.5px;`
+       + `font-weight:700;padding:1px 6px;border-radius:999px;vertical-align:middle;white-space:nowrap">`
+       + `(${b.text})</span>`;
+}
+
 // ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิมของระบบ)
 // ไม่ส่ง tripDate → ใช้ตัวล่าสุดของท่านั้น (default behavior แบบเก่า)
 function lookupPrice(priceMap, factory, invoice, tripDate, port) {
@@ -1545,7 +1558,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
     return `<tr class="row-trip">
       <td class="cat">ค่าเที่ยว</td>
       <td>${fmtThaiDate(t.date_in)}</td>
-      <td>${esc(label.slice(0,30))}${warn}<br><small class="muted">${esc(t.invoice_no || '')} • ${esc(t.container_no || '')}</small></td>
+      <td>${esc(label.slice(0,30))}${portBadge(t)}${warn}<br><small class="muted">${esc(t.invoice_no || '')} • ${esc(t.container_no || '')}</small></td>
       <td class="num">${fmtLiter(target)}</td>
       <td class="num">—</td>
       <td class="num">${fmtBaht(fee)}</td>
@@ -1813,7 +1826,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
                   ${carryList.map(t => `<tr>
                     <td><span class="pay-mark" style="background:#f59e0b;color:white">⏳</span></td>
                     <td>${fmtThaiDate(t.date_in)}</td>
-                    <td>${esc(t.factoryName || '?')}</td>
+                    <td>${esc(t.factoryName || '?')}${portBadge(t)}</td>
                     <td><small>${esc(t.invoice_no || '')}</small></td>
                     <td class="num">${fmtBaht(t.billAmt)}</td>
                   </tr>`).join('')}
@@ -1826,7 +1839,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
               list.map(t => `<tr class="${t.isPaid ? 'paid' : ''}">
                 <td>${t.isPaid ? '<span class="pay-mark paid">✓</span>' : '<span class="pay-mark">○</span>'}</td>
                 <td>${fmtThaiDate(t.date_in)}</td>
-                <td>${esc(t.factoryName || '?')}</td>
+                <td>${esc(t.factoryName || '?')}${portBadge(t)}</td>
                 <td><small>${esc(t.invoice_no || '')}${t.antsBill && t.antsBill.bill_no ? ' • ' + esc(t.antsBill.bill_no) : ''}</small></td>
                 <td class="num">${fmtBaht(t.billAmt)}</td>
               </tr>`).join('') +
