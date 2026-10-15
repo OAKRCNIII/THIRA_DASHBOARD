@@ -25,11 +25,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r sync/requirements.txt
 
+      # อ่านจาก ANTS containers_all (ได้ทุกท่า: ปาดัง/สงขลา/แหลมฉบัง)
+      # Dropbox ยังใส่ไว้เผื่อสั่ง --source excel ย้อนกลับได้
       - name: Run sync
-        run: python sync/thira_sync.py
+        run: python sync/thira_sync.py --source ants
         env:
           DROPBOX_APP_KEY:       ${{ secrets.DROPBOX_APP_KEY }}
           DROPBOX_APP_SECRET:    ${{ secrets.DROPBOX_APP_SECRET }}
           DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY:          ${{ secrets.SUPABASE_KEY }}
+          ANTS_URL:              ${{ secrets.ANTS_URL }}
+          ANTS_KEY:              ${{ secrets.ANTS_KEY }}

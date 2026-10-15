@@ -255,6 +255,9 @@ async function loadCache() {
 // ท่าที่รับ/คืนตู้ — โรงงานเดียวกันคนละท่า = คนละลิตร/ค่าเที่ยว (บ้านส้อง ปาดัง 210 ล. vs สงขลา 180 ล.)
 const DEFAULT_PORT = 'PADANG';
 function portOfTrip(trip) {
+  // 1) ตู้พกท่ามาเองถ้า sync ดึงจาก ANTS containers_all แล้ว (ทางหลัก)
+  if (trip && trip.port) return trip.port;
+  // 2) ถอยไปดูจากอินวอยซ์ (เผื่อ sync ยังเป็นรุ่นเก่าที่ยังไม่มีคอลัมน์ port)
   const inv = String(trip && trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
   return (cache.portByInvoice && cache.portByInvoice[inv]) || DEFAULT_PORT;
 }
