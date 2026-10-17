@@ -934,8 +934,8 @@ function portBadge(trip) {
 
 // ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิมของระบบ)
 // ไม่ส่ง tripDate → ใช้ตัวล่าสุดของท่านั้น (default behavior แบบเก่า)
-function lookupPrice(priceMap, factory, invoice, tripDate, port) {
-  const key = factory || (invoice || '').slice(0, 3);
+function lookupPrice(priceMap, factory, invoice, tripDate, port, trip) {
+  const key = refinePtn(factory || (invoice || '').slice(0, 3), trip);
   const list = priceMap[key];
   if (!list || list.length === 0) return { price: null, key };
   const want = port || DEFAULT_PORT;
@@ -969,10 +969,32 @@ function findActivePriceSet(priceSets, dateISO) {
   return null;  // ถ้าวันที่เก่ากว่า set แรกสุด — ไม่มี price
 }
 
+// ── ปัตตานี: ค่าขนส่งขึ้นกับ "ขนาดตู้" ไม่ใช่หัวอินวอยซ์ ──
+// เทียบใบวางบิลจริง 13 ใบแล้วตรง 100% — ตู้ 20' = 6,700 · ตู้ 40' = 7,600
+// หลักที่ 5 ของเบอร์ตู้คือรหัสขนาดตาม ISO 6346 (1/2/3 = 20 ฟุต · 4/6/7/9 = 40 ฟุตขึ้นไป)
+// เที่ยวเก่าบางใบ factory ว่าง เลยตกมาใช้หัวอินวอยซ์ 'PTN' ซึ่งเดิม map เป็น PTN40 เหมา
+// → ตู้ 20' จะคิดเกินไป 900 บาท ฉะนั้นต้องดูขนาดจากเบอร์ตู้แทน
+function containerFeet(containerNo) {
+  const m = String(containerNo || '').toUpperCase().replace(/\s+/g, '').match(/^[A-Z]{4}\d{7}$/);
+  if (!m) return null;
+  const d = String(containerNo).replace(/\s+/g, '')[4];
+  if ('123'.includes(d)) return 20;
+  if ('4679'.includes(d)) return 40;
+  return null;
+}
+
+// ถ้าปลายทางเป็นตระกูล PTN ให้เลือก PTN20/PTN40 ตามขนาดตู้
+// หาขนาดไม่ได้ → คืนค่าเดิม ไม่เดา
+function refinePtn(code, trip) {
+  if (!/^PTN/i.test(String(code || ''))) return code;
+  const ft = containerFeet(trip && trip.container_no);
+  return ft ? `PTN${ft}` : code;
+}
+
 // ดึงราคาวางบิลของเที่ยว: factory → freight_price_sets[factory_name]
 function billPriceForTrip(trip, factoryMap, priceSets) {
   // หา factory_name ใน freight_price_sets keys
-  const code = trip.factory || (trip.invoice_no || '').slice(0, 3);
+  const code = refinePtn(trip.factory || (trip.invoice_no || '').slice(0, 3), trip);
   const factoryName = factoryMap[code] || code;  // fallback ใช้ค่าเดิม
   const ps = findActivePriceSet(priceSets, trip.date_in);
   if (!ps || !ps.prices) return { amount: 0, factoryName, priceSet: null };
@@ -1231,7 +1253,7 @@ function computeTruckSummary(truck, trips, outs, incs, fp, billStatusByCnt, extr
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0;
   let bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
   for (const t of trips) {
-    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t));
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t), t);
     if (price) {
       tripTarget += Number(price[fuelCol] || 0);
       tripFee += Number(price.fee_driver || 0);
@@ -1569,7 +1591,7 @@ function renderReport(truck, p, trips, outs, incs, fp, billStatusByCnt, extras, 
   let bill1Total = 0, bill2Total = 0, bill1Paid = 0, bill2Paid = 0;
   const bill1Trips = [], bill2Trips = [];
   const tripRows = trips.map(t => {
-    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t));
+    const { price, key } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t), t);
     const target = price ? Number(price[fuelCol] || 0) : 0;
     const fee = price ? Number(price.fee_driver || 0) : 0;
     tripTarget += target;
@@ -2237,7 +2259,7 @@ function renderInput(p, plate, data) {
   const fuelCol = truck && truck.fuel_route === 1 ? 'fuel_liters_route_1' : 'fuel_liters_route_2';
   let tripTarget = 0;
   for (const t of (data.trips || [])) {
-    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t));
+    const { price } = lookupPrice(cache.priceMap, t.factory, t.invoice_no, t.date_in, portOfTrip(t), t);
     if (price) tripTarget += Number(price[fuelCol] || 0);
   }
   const extraL = (data.extras || []).reduce((s, e) => s + Number(e.liters || 0), 0);
