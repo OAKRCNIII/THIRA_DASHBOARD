@@ -114,6 +114,28 @@
 
   /* Category breakdown */
   .cat-list { background: white; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  /* โดนัท "รายรับไปไหนหมด" */
+  .dn-wrap { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; padding: 4px 0 2px; }
+  .dn-chart { position: relative; flex: 0 0 auto; }
+  .dn-sl { transition: opacity .12s; cursor: default; }
+  .dn-chart:hover .dn-sl { opacity: .45; }
+  .dn-chart .dn-sl:hover { opacity: 1; }
+  .dn-center { position: absolute; inset: 0; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; pointer-events: none; }
+  .dn-c-lbl { font-size: 11px; color: #78716c; }
+  .dn-c-val { font-size: 19px; font-weight: 800; color: #1e3a5f; font-variant-numeric: tabular-nums; }
+  .dn-tip { position: absolute; z-index: 5; background: #1f2937; color: #fff; font-size: 12px;
+            padding: 6px 9px; border-radius: 6px; pointer-events: none; white-space: nowrap;
+            line-height: 1.45; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+  .dn-legend { flex: 1 1 300px; min-width: 290px; }
+  .dn-lg { display: grid; grid-template-columns: 12px 1fr auto 52px; align-items: center;
+           gap: 9px; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+  .dn-chip { width: 12px; height: 12px; border-radius: 3px; }
+  .dn-nm { color: #444; }
+  .dn-am { font-variant-numeric: tabular-nums; font-weight: 600; color: #1e3a5f; }
+  .dn-pc { font-variant-numeric: tabular-nums; color: #888; text-align: right; font-size: 12px; }
+  @media print { .dn-chart:hover .dn-sl { opacity: 1 } .dn-tip { display: none } }
+
   .cat-row { display: grid; grid-template-columns: 140px 1fr 120px 50px; align-items: center; gap: 10px; padding: 5px 0; }
   .cat-row .name { font-size: 13px; color: #444; }
   .cat-row .progress { height: 10px; background: #f3f4f6; border-radius: 5px; overflow: hidden; }
@@ -255,6 +277,119 @@ function annualBadgesHTML(plate, outs) {
   </div>`;
 }
 
+// ── โดนัท "รายรับไปไหนหมด" ───────────────────────────────────────────────
+// แบ่งรายรับทั้งก้อนเป็นค่าใช้จ่ายแต่ละหมวด + กำไรที่เหลือ → รวมกันต้องเท่ารายรับพอดี
+//
+// ลำดับสีบนวงไม่ได้เรียงตามยอด แต่ตรึงไว้ต่อหมวด เพื่อให้สีหมายถึงหมวดเดิมเสมอ
+// ทุกคันทุกหน้า และลำดับนี้เลือกมาให้ชิ้นที่ติดกันแยกออกจากกันได้แม้ตาบอดสี
+// (ΔE ต่ำสุดของคู่ที่ติดกัน 9.2 ขึ้นไป ยกเว้น tritan ซึ่งพบน้อยมาก)
+const DONUT_RING = [
+  { cat: 'ค่าน้ำมัน',      color: '#eb6834' },
+  { cat: 'ค่าเที่ยวคนขับ',  color: '#2a78d6' },
+  { cat: 'ค่ายาง',         color: '#e34948' },
+  { cat: 'อื่นๆ',          color: '#9aa0a6' },
+  { cat: 'กำไร',           color: '#008300' },
+  { cat: 'เช็คระยะ',       color: '#6250d6' },
+  { cat: 'ประกัน',         color: '#1baf7a' },
+];
+const DONUT_MIN_PCT = 1.5;   // เล็กกว่านี้ยุบเข้า "อื่นๆ" — ชิ้นบางกว่านี้มองไม่เห็นอยู่ดี
+
+function buildDonutSlices(revenue, byCat) {
+  const named = new Set(DONUT_RING.map(r => r.cat));
+  const spend = Object.entries(byCat).reduce((s, [, v]) => s + Number(v || 0), 0);
+  const profit = revenue - spend;
+  const bucket = {};
+  let other = 0;
+  for (const [cat, vRaw] of Object.entries(byCat)) {
+    const v = Number(vRaw || 0);
+    if (v <= 0) continue;
+    // หมวดที่ไม่มีสีประจำ หรือเล็กเกินจนเป็นเส้นบางๆ → รวมเป็น "อื่นๆ"
+    if (!named.has(cat) || cat === 'อื่นๆ' || (revenue > 0 && v / revenue * 100 < DONUT_MIN_PCT)) other += v;
+    else bucket[cat] = (bucket[cat] || 0) + v;
+  }
+  if (other > 0) bucket['อื่นๆ'] = (bucket['อื่นๆ'] || 0) + other;
+  if (profit > 0) bucket['กำไร'] = profit;
+  const slices = DONUT_RING.filter(r => bucket[r.cat] > 0)
+    .map(r => ({ ...r, value: bucket[r.cat], pct: revenue > 0 ? bucket[r.cat] / revenue * 100 : 0 }));
+  return { slices, profit, spend };
+}
+
+function donutHTML(revenue, byCat, opts = {}) {
+  const { slices, profit, spend } = buildDonutSlices(revenue, byCat);
+  const id = 'dn' + Math.random().toString(36).slice(2, 8);
+  if (revenue <= 0 || !slices.length) return '<div class="muted" style="padding:12px">— ไม่มีข้อมูลพอจะวาดกราฟ —</div>';
+
+  const S = 260, R = 112, RI = 68, C = S / 2, GAP = 1.6;   // GAP = ช่องว่างระหว่างชิ้น (องศา)
+  const pt = (deg, r) => {
+    const a = (deg - 90) * Math.PI / 180;
+    return [C + r * Math.cos(a), C + r * Math.sin(a)];
+  };
+  let ang = 0;
+  const paths = slices.map(s => {
+    const sweep = s.pct / 100 * 360;
+    const a0 = ang + GAP / 2, a1 = ang + sweep - GAP / 2;
+    ang += sweep;
+    if (a1 <= a0) return '';
+    const big = (a1 - a0) > 180 ? 1 : 0;
+    const [x0, y0] = pt(a0, R),  [x1, y1] = pt(a1, R);
+    const [x2, y2] = pt(a1, RI), [x3, y3] = pt(a0, RI);
+    const d = `M${x0} ${y0}A${R} ${R} 0 ${big} 1 ${x1} ${y1}L${x2} ${y2}A${RI} ${RI} 0 ${big} 0 ${x3} ${y3}Z`;
+    const mid = (a0 + a1) / 2;
+    const [lx, ly] = pt(mid, (R + RI) / 2);
+    // ป้ายบนชิ้น เฉพาะชิ้นที่กว้างพอให้ตัวเลขไม่ล้น
+    const label = s.pct >= 6
+      ? `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central"
+               font-size="12" font-weight="700" fill="#fff" style="pointer-events:none"
+               paint-order="stroke" stroke="rgba(0,0,0,.25)" stroke-width="2">${s.pct.toFixed(1)}%</text>` : '';
+    return `<path d="${d}" fill="${s.color}" class="dn-sl"
+                  data-n="${esc(s.cat)}" data-v="${fmtBaht(s.value)}" data-p="${s.pct.toFixed(2)}"/>${label}`;
+  }).join('');
+
+  const legend = slices.map(s => `
+    <div class="dn-lg">
+      <span class="dn-chip" style="background:${s.color}"></span>
+      <span class="dn-nm">${esc(s.cat)}</span>
+      <span class="dn-am">${fmtBaht(s.value)}</span>
+      <span class="dn-pc">${s.pct.toFixed(1)}%</span>
+    </div>`).join('');
+
+  const lossNote = profit < 0
+    ? `<div style="margin-top:8px;font-size:12px;color:#b91c1c;font-weight:600">
+         ⚠️ ขาดทุน ${fmtBaht(Math.abs(profit))} — รายจ่าย ${fmtBaht(spend)} เกินรายรับ วงกลมจึงแสดงเฉพาะส่วนที่รายรับครอบคลุมได้
+       </div>` : '';
+
+  return `
+  <div class="dn-wrap" id="${id}">
+    <div class="dn-chart">
+      <svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}" role="img"
+           aria-label="สัดส่วนรายรับแยกตามค่าใช้จ่ายและกำไร">${paths}</svg>
+      <div class="dn-center">
+        <div class="dn-c-lbl">${esc(opts.centerLabel || 'รายรับทั้งหมด')}</div>
+        <div class="dn-c-val">${fmtBaht(revenue)}</div>
+      </div>
+      <div class="dn-tip" hidden></div>
+    </div>
+    <div class="dn-legend">${legend}${lossNote}</div>
+  </div>`;
+}
+
+// ผูก tooltip ให้โดนัททุกตัวในหน้า (เรียกหลัง innerHTML เสร็จ)
+function wireDonuts(root) {
+  (root || document).querySelectorAll('.dn-wrap').forEach(w => {
+    const tip = w.querySelector('.dn-tip');
+    w.querySelectorAll('.dn-sl').forEach(p => {
+      p.addEventListener('mousemove', e => {
+        const r = w.querySelector('.dn-chart').getBoundingClientRect();
+        tip.innerHTML = `<b>${p.dataset.n}</b><br>${p.dataset.v} บ. · ${p.dataset.p}%`;
+        tip.hidden = false;
+        tip.style.left = (e.clientX - r.left + 12) + 'px';
+        tip.style.top  = (e.clientY - r.top  + 12) + 'px';
+      });
+      p.addEventListener('mouseleave', () => { tip.hidden = true; });
+    });
+  });
+}
+
 function renderMonthly(year, data, trucksAll) {
   const trucks = trucksAll.filter(t => t.plate !== 'XX-XXXX');
   const monthKeys = [1,2,3,4,5,6,7,8,9,10,11,12];
@@ -333,6 +468,10 @@ function renderMonthly(year, data, trucksAll) {
 
   const netIn = f6In + xxIn, netOut = f6Out + xxOut;
   const netYear = netIn - netOut;
+
+  // ค่าใช้จ่ายทั้งฝูงแยกหมวด (รวม XX-XXXX ด้วย เพราะรายรับก็รวมแล้ว ไม่งั้นวงกลมจะไม่ครบ)
+  const fleetByCat = {};
+  for (const o of data.outs) fleetByCat[o.category] = (fleetByCat[o.category] || 0) + Number(o.amount || 0);
   const netCells = monthKeys.map(m => {
     let inc=0, out=0;
     for (const t of trucks) { const c=agg[t.plate]?.[m]||{income:0,outcome:0}; inc+=c.income; out+=c.outcome; }
@@ -357,6 +496,13 @@ function renderMonthly(year, data, trucksAll) {
       <div class="kpi"><div class="label">รายจ่ายรวมทั้งปี</div><div class="value">${fmtBaht(netOut)}</div></div>
       <div class="kpi ${netYear>=0?'profit-pos':'profit-neg'}"><div class="label">กำไรสุทธิทั้งปี</div><div class="value">${netYear>=0?'+':''}${fmtBaht(netYear)}</div></div>
       <div class="kpi"><div class="label">เดือนที่มีข้อมูล</div><div class="value">${monthKeys.filter(m => trucks.some(t => agg[t.plate]?.[m]) || agg['XX-XXXX']?.[m]).length} / 12</div></div>
+    </div>
+
+    <div class="card" style="padding:16px 20px;margin-bottom:16px">
+      <h3 style="font-size:16px;color:#1e3a5f;margin:0 0 10px;padding-bottom:4px;border-bottom:2px solid #e5e7eb">
+        🍩 รายรับทั้งฝูงไปไหนหมด — ${year + 543}
+      </h3>
+      ${donutHTML(netIn, fleetByCat, { centerLabel: 'รายรับทั้งฝูง' })}
     </div>
 
     <div style="overflow-x:auto;border-radius:8px">
@@ -406,6 +552,7 @@ async function reload() {
     const trucks = await loadTrucks();
     const data = await fetchMonthlyData(year);
     document.getElementById('report').innerHTML = renderMonthly(year, data, trucks);
+    wireDonuts(document.getElementById('report'));
     setStatus(null);
   } catch (e) {
     setStatus(null);
@@ -565,6 +712,9 @@ function renderTruckDetailModal(truck, year, outs, incs) {
         <div class="modal-kpi ${yProfit>=0?'profit-pos':'profit-neg'}"><div class="label">กำไรทั้งปี</div><div class="value">${yProfit>=0?'+':''}${fmtBaht(yProfit)}</div></div>
       </div>
 
+      <h3>🍩 รายรับไปไหนหมด</h3>
+      ${donutHTML(yIn, yearByCat, { centerLabel: 'รายรับ (net) ทั้งปี' })}
+
       <h3>📊 กำไรรายเดือน</h3>
       <div class="bar-chart">${barChart}</div>
 
@@ -590,6 +740,7 @@ function renderTruckDetailModal(truck, year, outs, incs) {
     </div>
   `;
   document.getElementById('modal-content').innerHTML = html;
+  wireDonuts(document.getElementById('modal-content'));
   document.getElementById('modal-overlay').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
