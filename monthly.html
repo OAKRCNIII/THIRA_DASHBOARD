@@ -134,6 +134,11 @@
   .dn-nm { color: #444; }
   .dn-am { font-variant-numeric: tabular-nums; font-weight: 600; color: #1e3a5f; }
   .dn-pc { font-variant-numeric: tabular-nums; color: #888; text-align: right; font-size: 12px; }
+  .dn-cnt { font-size: 10.5px; color: #9ca3af; background: #f3f4f6; padding: 1px 5px; border-radius: 8px; }
+  .dn-sub { padding: 3px 0 5px 21px; border-bottom: 1px solid #f3f4f6; }
+  .dn-sub-r { display: flex; justify-content: space-between; font-size: 11.5px; color: #78716c;
+              padding: 1.5px 0; font-variant-numeric: tabular-nums; }
+  .dn-sub-r span:first-child::before { content: '└ '; color: #d1d5db; }
   @media print { .dn-chart:hover .dn-sl { opacity: 1 } .dn-tip { display: none } }
 
   .cat-row { display: grid; grid-template-columns: 140px 1fr 120px 50px; align-items: center; gap: 10px; padding: 5px 0; }
@@ -300,17 +305,22 @@ function buildDonutSlices(revenue, byCat) {
   const profit = revenue - spend;
   const bucket = {};
   let other = 0;
+  const otherParts = [];   // เก็บไว้กางให้ดูว่าใน "อื่นๆ" มีหมวดอะไรบ้าง
   for (const [cat, vRaw] of Object.entries(byCat)) {
     const v = Number(vRaw || 0);
     if (v <= 0) continue;
     // หมวดที่ไม่มีสีประจำ หรือเล็กเกินจนเป็นเส้นบางๆ → รวมเป็น "อื่นๆ"
-    if (!named.has(cat) || cat === 'อื่นๆ' || (revenue > 0 && v / revenue * 100 < DONUT_MIN_PCT)) other += v;
-    else bucket[cat] = (bucket[cat] || 0) + v;
+    if (!named.has(cat) || cat === 'อื่นๆ' || (revenue > 0 && v / revenue * 100 < DONUT_MIN_PCT)) {
+      other += v;
+      otherParts.push({ cat, value: v });
+    } else bucket[cat] = (bucket[cat] || 0) + v;
   }
   if (other > 0) bucket['อื่นๆ'] = (bucket['อื่นๆ'] || 0) + other;
   if (profit > 0) bucket['กำไร'] = profit;
+  otherParts.sort((a, b) => b.value - a.value);
   const slices = DONUT_RING.filter(r => bucket[r.cat] > 0)
-    .map(r => ({ ...r, value: bucket[r.cat], pct: revenue > 0 ? bucket[r.cat] / revenue * 100 : 0 }));
+    .map(r => ({ ...r, value: bucket[r.cat], pct: revenue > 0 ? bucket[r.cat] / revenue * 100 : 0,
+                 parts: r.cat === 'อื่นๆ' ? otherParts : null }));
   return { slices, profit, spend };
 }
 
@@ -341,22 +351,35 @@ function donutHTML(revenue, byCat, opts = {}) {
       ? `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central"
                font-size="12" font-weight="700" fill="#fff" style="pointer-events:none"
                paint-order="stroke" stroke="rgba(0,0,0,.25)" stroke-width="2">${s.pct.toFixed(1)}%</text>` : '';
+    // ชิ้น "อื่นๆ" พก่รายละเอียดไปใน tooltip ด้วย จะได้ไม่ต้องเดาว่ามีอะไรอยู่ข้างใน
+    const partsAttr = s.parts && s.parts.length
+      ? ` data-parts="${esc(s.parts.map(p => `${p.cat} ${fmtBaht(p.value)}`).join(' · '))}"` : '';
     return `<path d="${d}" fill="${s.color}" class="dn-sl"
-                  data-n="${esc(s.cat)}" data-v="${fmtBaht(s.value)}" data-p="${s.pct.toFixed(2)}"/>${label}`;
+                  data-n="${esc(s.cat)}" data-v="${fmtBaht(s.value)}" data-p="${s.pct.toFixed(2)}"${partsAttr}/>${label}`;
   }).join('');
 
-  const legend = slices.map(s => `
+  const legend = slices.map(s => {
+    const sub = s.parts && s.parts.length > 1
+      ? `<div class="dn-sub">` + s.parts.map(p =>
+          `<div class="dn-sub-r"><span>${esc(p.cat)}</span><span>${fmtBaht(p.value)}</span></div>`).join('') + `</div>`
+      : '';
+    return `
     <div class="dn-lg">
       <span class="dn-chip" style="background:${s.color}"></span>
-      <span class="dn-nm">${esc(s.cat)}</span>
+      <span class="dn-nm">${esc(s.cat)}${s.parts && s.parts.length > 1 ? ` <span class="dn-cnt">${s.parts.length} หมวด</span>` : ''}</span>
       <span class="dn-am">${fmtBaht(s.value)}</span>
       <span class="dn-pc">${s.pct.toFixed(1)}%</span>
-    </div>`).join('');
+    </div>${sub}`;
+  }).join('');
 
   const lossNote = profit < 0
     ? `<div style="margin-top:8px;font-size:12px;color:#b91c1c;font-weight:600">
          ⚠️ ขาดทุน ${fmtBaht(Math.abs(profit))} — รายจ่าย ${fmtBaht(spend)} เกินรายรับ วงกลมจึงแสดงเฉพาะส่วนที่รายรับครอบคลุมได้
        </div>` : '';
+
+  const note = opts.note
+    ? `<div style="margin-top:10px;font-size:12px;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;
+                   padding:7px 10px;border-radius:5px;line-height:1.5">${opts.note}</div>` : '';
 
   return `
   <div class="dn-wrap" id="${id}">
@@ -369,7 +392,7 @@ function donutHTML(revenue, byCat, opts = {}) {
       </div>
       <div class="dn-tip" hidden></div>
     </div>
-    <div class="dn-legend">${legend}${lossNote}</div>
+    <div class="dn-legend">${legend}${lossNote}${note}</div>
   </div>`;
 }
 
@@ -500,7 +523,7 @@ function renderMonthly(year, data, trucksAll) {
 
     <div class="card" style="padding:16px 20px;margin-bottom:16px">
       <h3 style="font-size:16px;color:#1e3a5f;margin:0 0 10px;padding-bottom:4px;border-bottom:2px solid #e5e7eb">
-        🍩 รายรับทั้งฝูงไปไหนหมด — ${year + 543}
+        🍩 แผนภูมิวงกลม รวมทั้งฝูง — ${year + 543}
       </h3>
       ${donutHTML(netIn, fleetByCat, { centerLabel: 'รายรับทั้งฝูง' })}
     </div>
@@ -712,8 +735,14 @@ function renderTruckDetailModal(truck, year, outs, incs) {
         <div class="modal-kpi ${yProfit>=0?'profit-pos':'profit-neg'}"><div class="label">กำไรทั้งปี</div><div class="value">${yProfit>=0?'+':''}${fmtBaht(yProfit)}</div></div>
       </div>
 
-      <h3>🍩 รายรับไปไหนหมด</h3>
-      ${donutHTML(yIn, yearByCat, { centerLabel: 'รายรับ (net) ทั้งปี' })}
+      <h3>🍩 แผนภูมิวงกลม</h3>
+      ${donutHTML(yIn, yearByCat, {
+        centerLabel: 'รายรับ (net) ทั้งปี',
+        // ค่าส่วนกลางลงที่ทะเบียน XX-XXXX ไม่ได้แยกเข้ารายคัน → กำไรรายคันจึงยังไม่ถูกหักส่วนนี้
+        note: '⚠️ <b>กำไรนี้ยังไม่ได้หักค่าส่วนกลาง</b> (บัญชี · ร้อยละ4 · อื่นๆ) '
+            + 'ซึ่งลงรวมไว้ที่ทะเบียน XX-XXXX ไม่ได้แยกเข้าแต่ละคัน — '
+            + 'ดูกำไรหลังหักครบได้ที่กราฟรวมฝูงหน้าแรก'
+      })}
 
       <h3>📊 กำไรรายเดือน</h3>
       <div class="bar-chart">${barChart}</div>
