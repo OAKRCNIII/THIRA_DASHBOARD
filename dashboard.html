@@ -721,6 +721,7 @@
       <input id="period-input" type="text" placeholder="5.2/2026">
       <button onclick="changePeriod(+1)" title="รอบถัดไป">▶</button>
       <button onclick="reload()" title="โหลดใหม่">🔄</button>
+      <button id="btn-sync-now" onclick="syncNow()" title="ดึงตู้จาก ANTS เดี๋ยวนี้ (ปกติ sync เองทุก 30 นาที)">⚡</button>
       <button onclick="setAntsKey()" title="ตั้ง ANTS key">🔑</button>
     </div>
   </div>
@@ -763,6 +764,36 @@ const SUPABASE_KEY = 'sb_publishable_SOknLoFYH4_kpCEWSWP-TQ_L9L4PR9o';
 const ANTS_URL = 'https://ywslgrusflfuxtrtvlfu.supabase.co';
 const ANTS_PUBLISHABLE = 'sb_publishable_nrjNNyA08-GCRphIQuzvvg_YpGxiYeY';
 let antsAuthError = '';   // ข้อความบอก user เวลาอ่านสถานะบิลไม่ได้
+
+// ⚡ SYNC เดี๋ยวนี้ — ตู้ sync จาก ANTS มาเองทุก 30 นาที ปุ่มนี้ไว้เร่งตอนเพิ่งแก้ข้อมูลฝั่ง ANTS
+// GitHub token อยู่ฝั่ง Edge Function (ใส่ในหน้าเว็บจะหลุด)
+window.syncNow = async function() {
+  const btn = document.getElementById('btn-sync-now');
+  const restore = () => { if (btn) { btn.disabled = false; btn.textContent = '⚡'; } };
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/trigger-thira-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY },
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok && !out.ok) {
+      alert('❌ ' + (out.message || out.error || `สั่ง sync ไม่สำเร็จ (${res.status})`));
+      restore();
+      return;
+    }
+    // รอ job ฝั่ง GitHub ทำงานเสร็จก่อนค่อยโหลดใหม่ ไม่งั้นได้ข้อมูลเดิม
+    setStatus(out.already ? 'กำลัง sync อยู่แล้ว รอสักครู่...' : 'สั่ง sync แล้ว รอประมาณ 30 วินาที...');
+    await new Promise(r => setTimeout(r, 32000));
+    cache = {};
+    await reload();
+    setStatus(null);
+  } catch (e) {
+    alert('❌ สั่ง sync ไม่สำเร็จ: ' + (e.message || e));
+  } finally {
+    restore();
+  }
+};
 
 window.setAntsKey = async function() {
   const { data: { session } } = await ants.auth.getSession();
