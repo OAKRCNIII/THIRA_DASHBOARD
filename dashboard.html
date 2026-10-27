@@ -991,11 +991,19 @@ function refinePtn(code, trip) {
   return ft ? `PTN${ft}` : code;
 }
 
-// ดึงราคาวางบิลของเที่ยว: factory → freight_price_sets[factory_name]
+// ดึงราคาวางบิลของเที่ยว
+// ชุดราคา (freight_price_sets) เก็บค่าเดียวต่อโรงงาน แยกท่าไม่ได้ — ท่าไหนคิดไม่เท่ากัน
+// ให้กรอก thira.prices.freight_price ของท่านั้นไว้ ตัวนั้นจะชนะชุดราคา
+// (เคสแรก: ปัตตานี 20FT ปาดัง 6,700 vs สงขลา 8,500)
 function billPriceForTrip(trip, factoryMap, priceSets) {
-  // หา factory_name ใน freight_price_sets keys
   const code = refinePtn(trip.factory || (trip.invoice_no || '').slice(0, 3), trip);
   const factoryName = factoryMap[code] || code;  // fallback ใช้ค่าเดิม
+
+  const { price } = lookupPrice(cache.priceMap, trip.factory, trip.invoice_no, trip.date_in, portOfTrip(trip), trip);
+  if (price && price.freight_price != null && +price.freight_price > 0) {
+    return { amount: +price.freight_price, factoryName, priceSet: null, fromPortRate: true };
+  }
+
   const ps = findActivePriceSet(priceSets, trip.date_in);
   if (!ps || !ps.prices) return { amount: 0, factoryName, priceSet: null };
   const amt = +(ps.prices[factoryName] || 0);
