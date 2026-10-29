@@ -495,9 +495,33 @@ function findActivePriceSet(priceSets, dateISO) {
 }
 
 // Bill price จาก freight_price_sets (fallback ถ้า ANTS ไม่มี)
+// ปัตตานี: ค่าขนส่งขึ้นกับขนาดตู้ ไม่ใช่หัวอินวอยซ์ (ISO 6346 หลักที่ 5)
+// 1/2/3 = 20 ฟุต · 4/6/7/9 = 40 ฟุตขึ้นไป — หาขนาดไม่ได้คืนค่าเดิม ไม่เดา
+function containerFeet(containerNo) {
+  const s = String(containerNo || '').toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z]{4}\d{7}$/.test(s)) return null;
+  const d = s[4];
+  if ('123'.includes(d)) return 20;
+  if ('4679'.includes(d)) return 40;
+  return null;
+}
+function refinePtn(code, trip) {
+  if (!/^PTN/i.test(String(code || ''))) return code;
+  const ft = containerFeet(trip && trip.container_no);
+  return ft ? `PTN${ft}` : code;
+}
+
+// ชุดราคาเก็บค่าเดียวต่อโรงงาน แยกท่าไม่ได้ → ท่าไหนคิดไม่เท่ากันให้กรอก
+// thira.prices.freight_price ของท่านั้น ตัวนั้นชนะชุดราคา (เคสแรก: ปัตตานี 20FT สงขลา 8,500)
 function billPriceForTrip(trip) {
-  const code = trip.factory || (trip.invoice_no || '').slice(0, 3);
+  const code = refinePtn(trip.factory || (trip.invoice_no || '').slice(0, 3), trip);
   const factoryName = (cache.factoryMap && cache.factoryMap[code]) || code;
+
+  const pr = lookupPrice(trip.factory, trip.invoice_no, trip.date_in, portOfTrip(trip), trip);
+  if (pr && pr.freight_price != null && +pr.freight_price > 0) {
+    return { amount: +pr.freight_price, factoryName, fromPortRate: true };
+  }
+
   const ps = findActivePriceSet(cache.priceSets, trip.date_in);
   if (!ps || !ps.prices) return { amount: 0, factoryName };
   const amt = +(ps.prices[factoryName] || 0);
@@ -565,8 +589,8 @@ function portOfTrip(trip) {
 }
 
 // ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิม)
-function lookupPrice(factory, invoice, tripDate, port) {
-  const key = factory || (invoice||'').slice(0,3);
+function lookupPrice(factory, invoice, tripDate, port, trip) {
+  const key = refinePtn(factory || (invoice||'').slice(0,3), trip);
   const list = cache.priceMap[key];
   if (!list || list.length === 0) return null;
   const want = port || DEFAULT_PORT;
@@ -627,7 +651,7 @@ function compute(truck, p, d) {
   let bill1 = 0, bill2 = 0, bill1Paid = 0, bill2Paid = 0, bill1Cnt = 0, bill2Cnt = 0, bill1PaidCnt = 0, bill2PaidCnt = 0;
 
   for (const t of d.trips) {
-    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in, portOfTrip(t));
+    const pr = lookupPrice(t.factory, t.invoice_no, t.date_in, portOfTrip(t), t);
     if (pr) { tripTarget += Number(pr[fuelCol]||0); tripFee += Number(pr.fee_driver||0); }
     const ab = d.billStatus[t.container_no];
     const isPaid = !!(ab && ab.bill_no);
@@ -832,7 +856,7 @@ function showDetail(plate) {
   const profitClass = sum.profit >= 0 ? 'pos' : 'neg';
 
   const tripList = d.trips.slice(0, 10).map(tr => {
-    const pr = lookupPrice(tr.factory, tr.invoice_no, tr.date_in, portOfTrip(tr));
+    const pr = lookupPrice(tr.factory, tr.invoice_no, tr.date_in, portOfTrip(tr), tr);
     const fee = pr ? Number(pr.fee_driver||0) : 0;
     const label = tr.factory || (tr.invoice_no||'').slice(0,12);
     return `<div class="detail-list-item">
