@@ -1021,11 +1021,16 @@ const BILL2_EXCEPTIONS = new Set([
   'KNT(JANG2)021/2026',
 ]);
 
+// OGM วงเล็บไหนที่อยู่บิล 1 — ระบุเป็นตัวๆ ไม่ใช่ startsWith('OGM(A') กว้างๆ
+// ไม่งั้น OGM วงเล็บใหม่ที่ขึ้นต้นด้วย A จะหลุดเข้าบิล 1 เองโดยไม่มีใครสั่ง
+// ที่มีในข้อมูลจริง: OGM(A) 1473 เที่ยว · OGM(AD) 17 (เริ่ม 27 ต.ค.69) · OGM(Yang) 13 · OGM(J) 12
+const BILL1_OGM = ['OGM(A)', 'OGM(AD)'];
+
 function isBill1(trip) {
   // ลบ space ทั้งหมดเพื่อจับ "OGM(A)" / "OGM (A)" / "OGM( A )" ให้เหมือนกัน
   const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
   if (BILL2_EXCEPTIONS.has(inv)) return false;   // ยกเว้นรายใบ — ชนะทุกกติกาข้างล่าง
-  if (inv.startsWith('OGM(A)')) return true;    // เฉพาะ OGM(A) เท่านั้น
+  if (BILL1_OGM.some(p => inv.startsWith(p))) return true;
   if (BILL1_PREFIXES.some(p => inv.startsWith(p))) return true;
   return false;                                  // OGM(J), OGM(Yang), OGM(B)... → BILL 2
 }

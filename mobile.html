@@ -443,10 +443,13 @@ const BILL2_EXCEPTIONS = new Set([
   'KNT(JANG2)021/2026',
 ]);
 
+// OGM วงเล็บที่อยู่บิล 1 — ระบุเป็นตัวๆ (OGM(AD) เริ่มใช้ 27 ต.ค.69) ต้องตรงกับ dashboard.html
+const BILL1_OGM = ['OGM(A)', 'OGM(AD)'];
+
 function isBill1(trip) {
   const inv = (trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
   if (BILL2_EXCEPTIONS.has(inv)) return false;   // ยกเว้นรายใบ — ชนะทุกกติกาข้างล่าง
-  if (inv.startsWith('OGM(A)')) return true;
+  if (BILL1_OGM.some(p => inv.startsWith(p))) return true;
   if (BILL1_PREFIXES.some(p => inv.startsWith(p))) return true;
   return false;
 }
