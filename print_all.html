@@ -241,11 +241,16 @@ async function loadCache() {
   // map อินวอยซ์ → ท่า (ANTS invoices.port) · อ่านไม่ได้ = ถือเป็นปาดังหมด (พฤติกรรมเดิม)
   cache.portByInvoice = {};
   try {
-    const invRes = await antsProj.from('invoices').select('invoice_no,port').limit(50000);
-    if (invRes.error) throw invRes.error;
-    for (const r of invRes.data || []) {
-      const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
-      if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+    // ⚠️ PostgREST ตัดที่ 1000 แถว/คำขอ และไม่สน .limit() → ต้องวนด้วย .range()
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await antsProj.from('invoices')
+        .select('invoice_no,port').order('invoice_no').range(from, from + 999);
+      if (error) throw error;
+      for (const r of data) {
+        const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+        if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+      }
+      if (data.length < 1000) break;
     }
   } catch (e) {
     console.warn('อ่าน invoices.port ไม่ได้ — ถือเป็นปาดังทั้งหมด:', e.message || e);
@@ -260,6 +265,20 @@ function portOfTrip(trip) {
   // 2) ถอยไปดูจากอินวอยซ์ (เผื่อ sync ยังเป็นรุ่นเก่าที่ยังไม่มีคอลัมน์ port)
   const inv = String(trip && trip.invoice_no || '').toUpperCase().replace(/\s+/g, '');
   return (cache.portByInvoice && cache.portByInvoice[inv]) || DEFAULT_PORT;
+}
+
+// ป้ายบอกท่าต่อท้ายชื่อโรงงาน — เหมือนหน้าแดชบอร์ด (ปาดัง = ค่าปกติ ไม่ติดป้าย)
+// ต้องมีในใบรีพอร์ตด้วย ไม่งั้นดูใบอย่างเดียวแยกไม่ออกว่าเที่ยวไหนไปสงขลา (RCN 18 พ.ย.69)
+const PORT_BADGE = {
+  SONGKHLA: { text: 'สงขลา',   bg: '#0e7490', fg: '#ffffff' },
+  LCB:      { text: 'แหลมฉบัง', bg: '#7c3aed', fg: '#ffffff' },
+};
+function portBadge(trip) {
+  const b = PORT_BADGE[portOfTrip(trip)];
+  if (!b) return '';
+  return ` <span style="display:inline-block;background:${b.bg};color:${b.fg};font-size:9px;`
+       + `font-weight:700;padding:0 5px;border-radius:999px;vertical-align:middle;white-space:nowrap;`
+       + `-webkit-print-color-adjust:exact;print-color-adjust:exact">(${b.text})</span>`;
 }
 
 // ถ้าท่านั้นยังไม่มีเรตของโรงงานนี้ → ถอยไปใช้ของปาดัง (เรตฐานเดิม)
@@ -405,7 +424,7 @@ function renderTruckPage(truck, p, data, pay) {
     return `<tr class="row-trip">
       <td class="cat">ค่าเที่ยว</td>
       <td>${fmtDate(t.date_in)}</td>
-      <td>${esc(label.slice(0,28))}<br><small class="muted">${esc(t.invoice_no||'')} • ${esc(t.container_no||'')}</small></td>
+      <td>${esc(label.slice(0,28))}${portBadge(t)}<br><small class="muted">${esc(t.invoice_no||'')} • ${esc(t.container_no||'')}</small></td>
       <td class="num">${fmtLiter(target)}</td>
       <td class="num">—</td>
       <td class="num">${fmtBaht(fee)}</td>

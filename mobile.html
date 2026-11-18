@@ -441,6 +441,8 @@ const BILL2_EXCEPTIONS = new Set([
   'KNT(JANG2)017/2026',
   'KNT(JANG2)019/2026',
   'KNT(JANG2)021/2026',
+  'KNT(JANG2)024/2026',
+  'KNT(JANG2)025/2026',
 ]);
 
 // OGM วงเล็บที่อยู่บิล 1 — ระบุเป็นตัวๆ (OGM(AD) เริ่มใช้ 27 ต.ค.69) ต้องตรงกับ dashboard.html
@@ -568,11 +570,16 @@ async function loadCache() {
   cache.portByInvoice = {};
   if (ants) {
     try {
-      const invRes = await ants.from('invoices').select('invoice_no,port').limit(50000);
-      if (invRes.error) throw invRes.error;
-      for (const r of invRes.data || []) {
-        const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
-        if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+      // ⚠️ PostgREST ตัดที่ 1000 แถว/คำขอ และไม่สน .limit() → ต้องวนด้วย .range()
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await ants.from('invoices')
+          .select('invoice_no,port').order('invoice_no').range(from, from + 999);
+        if (error) throw error;
+        for (const r of data) {
+          const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
+          if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
+        }
+        if (data.length < 1000) break;
       }
     } catch (e) {
       console.warn('อ่าน invoices.port ไม่ได้ — ถือเป็นปาดังทั้งหมด:', e.message || e);

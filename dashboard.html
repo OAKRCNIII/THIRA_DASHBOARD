@@ -1019,6 +1019,8 @@ const BILL2_EXCEPTIONS = new Set([
   'KNT(JANG2)017/2026',
   'KNT(JANG2)019/2026',
   'KNT(JANG2)021/2026',
+  'KNT(JANG2)024/2026',
+  'KNT(JANG2)025/2026',
 ]);
 
 // OGM วงเล็บไหนที่อยู่บิล 1 — ระบุเป็นตัวๆ ไม่ใช่ startsWith('OGM(A') กว้างๆ
@@ -1063,6 +1065,21 @@ function buildBillStatus(bills, trips) {
 }
 
 // ─── Data fetch ────────────────────────────────────────────
+// ⚠️ PostgREST จำกัดผลลัพธ์ 1000 แถว/คำขอ และ "ไม่สน" .limit(50000) ที่ใส่ไป
+//    → ตัดเงียบ ๆ ไม่มี error. ต้องวนดึงทีละหน้าด้วย .range() จนกว่าจะหมด
+//    เคสจริง 18 พ.ย.69: containers แตะ 1000 แถว การ์ด "เที่ยวบิล 2 รายงวด" ค้างที่ 644
+//    ไม่ขยับอีกเลย เพราะเที่ยวใหม่ทุกใบหลุดอยู่นอก 1000 แถวแรก
+const PAGE = 1000;
+async function fetchAll(makeQuery) {
+  const out = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < PAGE) return out;   // หน้าสุดท้ายไม่เต็ม = หมดแล้ว
+  }
+}
+
 async function loadCache() {
   if (cache.trucks) return;
   setStatus('โหลดข้อมูล master...');
@@ -1082,15 +1099,13 @@ async function loadCache() {
   if (frRes.error) throw frRes.error;
   // ── Bill 2 trips (อื่นๆ) ของฝูง THIRA ยกเว้น 72-2420 — สำหรับ summary รายงวด ──
   const thiraPlates = tRes.data.map(t => t.plate).filter(p => p !== '72-2420' && p !== 'XX-XXXX');
-  const bill2Res = await sba.from('containers')
+  const bill2Rows = await fetchAll(() => sba.from('containers')
     .select('date_in,truck_plate,invoice_no')
     .in('truck_plate', thiraPlates)
-    .order('date_in')
-    .limit(50000);
-  if (bill2Res.error) throw bill2Res.error;
+    .order('date_in'));
   // group by period (M.H) — H=1 ถ้า day<=15, ไม่งั้น H=2
   const bill2Periods = {};
-  for (const t of bill2Res.data) {
+  for (const t of bill2Rows) {
     if (isBill1(t)) continue;
     const d = t.date_in;
     if (!d) continue;
@@ -1126,9 +1141,9 @@ async function loadCache() {
   // ต้องล็อกอิน ANTS ก่อน (ปุ่ม 🔑) ถ้าอ่านไม่ได้ก็ถือว่าเป็นปาดังหมด = พฤติกรรมเดิม ไม่พัง
   cache.portByInvoice = {};
   try {
-    const invRes = await ants.from('invoices').select('invoice_no,port').limit(50000);
-    if (invRes.error) throw invRes.error;
-    for (const r of invRes.data || []) {
+    // 643 ใบ ณ 18 พ.ย.69 — ยังไม่ชน 1000 แต่ดึงแบบแบ่งหน้าไว้ก่อน กันพังเงียบตอนใบเกิน 1000
+    const invRows = await fetchAll(() => ants.from('invoices').select('invoice_no,port').order('invoice_no'));
+    for (const r of invRows) {
       const k = String(r.invoice_no || '').toUpperCase().replace(/\s+/g, '');
       if (k) cache.portByInvoice[k] = r.port || DEFAULT_PORT;
     }
